@@ -7,3 +7,6 @@
 [submodule "dapp/lib/durin"]
 	path = dapp/lib/durin
 	url = https://github.com/namestonehq/durin
+[submodule "dapp/lib/ens-contracts"]
+	path = dapp/lib/ens-contracts
+	url = https://github.com/ensdomains/ens-contracts
