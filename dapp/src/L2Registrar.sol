@@ -2,14 +2,15 @@
 pragma solidity ^0.8.20;
 
 import {StringUtils} from "@ensdomains/ens-contracts/utils/StringUtils.sol";
-
 import {IL2Registry} from "../interfaces/IL2Registry.sol";
 
-/// @dev This is an example registrar contract that is mean to be modified.
 contract L2Registrar {
     using StringUtils for string;
 
-    /// @notice Emitted when a new name is registered
+    /// @notice The account with permission to add/modify names
+    address public admin;
+
+    /// @notice Emitted when a new name is registered or modified
     /// @param label The registered label (e.g. "name" in "name.eth")
     /// @param owner The owner of the newly registered name
     event NameRegistered(string indexed label, address indexed owner);
@@ -23,10 +24,13 @@ contract L2Registrar {
     /// @notice The coinType for the current chain (ENSIP-11)
     uint256 public immutable coinType;
 
-    /// @notice Initializes the registrar with a registry contract
+    /// @notice Initializes the registrar with a registry contract and sets the admin.
     /// @param _registry Address of the L2Registry contract
     constructor(address _registry) {
-        // Save the chainId in memory (can only access this in assembly)
+        // Set the deployer as the admin
+        admin = msg.sender;
+
+        // Save the chainId in memory (accessed via assembly)
         assembly {
             sstore(chainId.slot, chainid())
         }
@@ -38,10 +42,16 @@ contract L2Registrar {
         registry = IL2Registry(_registry);
     }
 
-    /// @notice Registers a new name
+    /// @dev Modifier that allows only the admin to call a function.
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can modify registry");
+        _;
+    }
+
+    /// @notice Registers a new name. Only the admin can call this function.
     /// @param label The label to register (e.g. "name" for "name.eth")
     /// @param owner The address that will own the name
-    function register(string calldata label, address owner) external {
+    function register(string calldata label, address owner) external onlyAdmin {
         bytes32 node = _labelToNode(label);
         bytes memory addr = abi.encodePacked(owner); // Convert address to bytes
 
@@ -63,8 +73,7 @@ contract L2Registrar {
         emit NameRegistered(label, owner);
     }
 
-    /// @notice Checks if a given label is available for registration
-    /// @dev Uses try-catch to handle the ERC721NonexistentToken error
+    /// @notice Checks if a given label is available for registration.
     /// @param label The label to check availability for
     /// @return available True if the label can be registered, false if already taken
     function available(string calldata label) external view returns (bool) {
@@ -85,5 +94,12 @@ contract L2Registrar {
         string calldata label
     ) private view returns (bytes32) {
         return registry.makeNode(registry.baseNode(), label);
+    }
+    
+    /// @notice Allows the admin to change the admin account.
+    /// @param newAdmin The new admin address.
+    function updateAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "Invalid admin address");
+        admin = newAdmin;
     }
 }

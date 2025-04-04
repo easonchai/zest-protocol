@@ -4,3 +4,6 @@
 [submodule "dapp/lib/openzeppelin-contracts"]
 	path = dapp/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "dapp/lib/durin"]
+	path = dapp/lib/durin
+	url = https://github.com/namestonehq/durin
