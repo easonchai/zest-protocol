@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {StringUtils} from "@ensdomains/ens-contracts/utils/StringUtils.sol";
-import {IL2Registry} from "../interfaces/IL2Registry.sol";
+import {IL2Registry} from "@durin/contracts/interfaces/IL2Registry.sol";
 
 contract L2Registrar {
     using StringUtils for string;
@@ -73,7 +73,8 @@ contract L2Registrar {
         emit NameRegistered(label, owner);
     }
 
-    /// @notice Checks if a given label is available for registration.
+    /// @notice Checks if a given label is available for registration
+    /// @dev Uses try-catch to handle the ERC721NonexistentToken error
     /// @param label The label to check availability for
     /// @return available True if the label can be registered, false if already taken
     function available(string calldata label) external view returns (bool) {
@@ -102,4 +103,5 @@ contract L2Registrar {
         require(newAdmin != address(0), "Invalid admin address");
         admin = newAdmin;
     }
+
 }
