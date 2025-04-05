@@ -17,6 +17,15 @@ export async function calculateSZESTAmount(amount: string): Promise<string> {
   return Number(ethers.formatEther(bigIntAmount)).toFixed(2);
 }
 
+export async function getBtcPrice(): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/price-feed`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch BTC price");
+  }
+  const data = await response.json();
+  return data.cBTC.toFixed(2);
+}
+
 export async function getBalance(address: string): Promise<{
   address: string;
   cbtc: string;
