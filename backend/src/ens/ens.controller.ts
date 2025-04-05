@@ -44,7 +44,7 @@ export class ENSController {
   @ApiParam({
     name: 'nameOrAddress',
     description: 'ENS name or Ethereum address',
-    example: 'vitalik.eth',
+    example: 'vitalik.zest',
   })
   async getAvatar(@Param('nameOrAddress') nameOrAddress: string) {
     return this.ensService.getAvatar(nameOrAddress);
@@ -56,7 +56,7 @@ export class ENSController {
   @ApiParam({
     name: 'name',
     description: 'The ENS name to query',
-    example: 'vitalik.eth',
+    example: 'vitalik.zest',
   })
   @ApiQuery({
     name: 'key',
