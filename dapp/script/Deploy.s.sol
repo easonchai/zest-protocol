@@ -5,10 +5,8 @@ import "forge-std/Script.sol";
 import "../src/Zest.sol";
 import "../src/CDPManager.sol";
 import "../src/StabilityPool.sol";
-import "../src/Staking.sol";
 import "../src/SwapModule.sol";
 import "../src/MockUSDT.sol";
-import "../src/sZest.sol";
 
 contract DeployScript is Script {
     // Test accounts
@@ -20,7 +18,6 @@ contract DeployScript is Script {
     uint256 public constant INITIAL_ZEST_BALANCE = 1_000_000e18;
     uint256 public constant STABILITY_POOL_DEPOSIT = 500_000e18;
     uint256 public constant SWAP_MODULE_BALANCE = 100_000e18;
-    uint256 public constant STAKING_BALANCE = 100_000e18;
 
     function run() external {
         // Retrieve deployer private key from environment
@@ -37,8 +34,16 @@ contract DeployScript is Script {
         Zest zest = new Zest(admin);
         console.log("Zest deployed to:", address(zest));
 
+        // Deploy Swap Module
+        SwapModule swapModule = new SwapModule(
+            address(usdt),
+            address(zest),
+            admin
+        );
+        console.log("SwapModule deployed to:", address(swapModule));
+
         // Deploy Stability Pool
-        StabilityPool stabilityPool = new StabilityPool(address(zest));
+        StabilityPool stabilityPool = new StabilityPool(address(zest), address(swapModule));
         console.log("StabilityPool deployed to:", address(stabilityPool));
 
         // Deploy CDP Manager
@@ -48,31 +53,10 @@ contract DeployScript is Script {
         );
         console.log("CDPManager deployed to:", address(cdpManager));
 
-        // Deploy sZEST token
-        sZest sZestToken = new sZest(admin);
-        console.log("sZEST token deployed to:", address(sZestToken));
-
-        // Deploy Staking contract
-        Staking staking = new Staking(
-            address(zest),
-            address(sZestToken),
-            admin
-        );
-        console.log("Staking deployed to:", address(staking));
-
-        // Deploy Swap Module
-        SwapModule swapModule = new SwapModule(
-            address(usdt),
-            address(zest),
-            admin
-        );
-        console.log("SwapModule deployed to:", address(swapModule));
-
         // Setup roles and permissions
         zest.grantRole(zest.MINTER_ROLE(), address(cdpManager));
         zest.grantRole(zest.MINTER_ROLE(), address(swapModule));
         stabilityPool.grantRole(stabilityPool.CDP_ROLE(), address(cdpManager));
-        sZestToken.grantRole(sZestToken.MINTER_ROLE(), address(staking));
 
         // Set initial cBTC Price
         cdpManager.setCBTCPrice(85000e18);
@@ -90,11 +74,10 @@ contract DeployScript is Script {
         zest.mint(admin, INITIAL_ZEST_BALANCE);
         zest.mint(BOB, INITIAL_ZEST_BALANCE);
         zest.mint(address(swapModule), SWAP_MODULE_BALANCE);
-        zest.mint(address(staking), STAKING_BALANCE);
 
         // Setup initial deposits
         zest.approve(address(stabilityPool), STABILITY_POOL_DEPOSIT);
-        stabilityPool.deposit(STABILITY_POOL_DEPOSIT);
+        stabilityPool.deposit(STABILITY_POOL_DEPOSIT, admin);
 
         vm.stopBroadcast();
 
@@ -103,10 +86,8 @@ contract DeployScript is Script {
         console.log("-------------------");
         console.log("Mock USDT:", address(usdt));
         console.log("ZEST Token:", address(zest));
-        console.log("sZEST Token:", address(sZestToken));
         console.log("CDP Manager:", address(cdpManager));
         console.log("Stability Pool:", address(stabilityPool));
-        console.log("Staking:", address(staking));
         console.log("Swap Module:", address(swapModule));
 
         console.log("\nInitial Balances:");
@@ -119,7 +100,6 @@ contract DeployScript is Script {
         console.log("Bob ZEST:", INITIAL_ZEST_BALANCE);
         console.log("SwapModule USDT:", INITIAL_USDT_BALANCE);
         console.log("SwapModule ZEST:", SWAP_MODULE_BALANCE);
-        console.log("Staking ZEST:", STAKING_BALANCE);
         console.log("StabilityPool ZEST:", STABILITY_POOL_DEPOSIT);
     }
 } 

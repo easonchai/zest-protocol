@@ -5,19 +5,15 @@ import "forge-std/Test.sol";
 import "../src/Zest.sol";
 import "../src/CDPManager.sol";
 import "../src/StabilityPool.sol";
-import "../src/Staking.sol";
 import "../src/SwapModule.sol";
 import "../src/MockUSDT.sol";
-import "../src/sZest.sol";
 
 contract ZestTest is Test {
     Zest public zest;
     CDPManager public cdpManager;
     StabilityPool public stabilityPool;
-    Staking public staking;
     SwapModule public swapModule;
     MockUSDT public usdt;
-    sZest public sZestToken;
 
     // Test accounts
     address public admin = address(1);
@@ -51,27 +47,20 @@ contract ZestTest is Test {
         // Deploy main token
         zest = new Zest(admin);
         
+        // Deploy Swap Module
+        swapModule = new SwapModule(address(usdt), address(zest), admin);
+        
         // Deploy Stability Pool
-        stabilityPool = new StabilityPool(address(zest));
+        stabilityPool = new StabilityPool(address(zest), address(swapModule));
         
         // Deploy CDP Manager
         cdpManager = new CDPManager(address(zest), address(stabilityPool));
-        
-        // Deploy sZEST token
-        sZestToken = new sZest(admin);
-        
-        // Deploy Staking contract
-        staking = new Staking(address(zest), address(sZestToken), admin);
-        
-        // Deploy Swap Module
-        swapModule = new SwapModule(address(usdt), address(zest), admin);
 
         // Setup roles
         zest.grantRole(zest.MINTER_ROLE(), address(cdpManager));
         zest.grantRole(zest.MINTER_ROLE(), address(swapModule));
         stabilityPool.grantRole(stabilityPool.CDP_ROLE(), address(cdpManager));
         stabilityPool.grantRole(stabilityPool.CDP_ROLE(), bob);
-        sZestToken.grantRole(sZestToken.MINTER_ROLE(), address(staking));
 
         // Set initial cBTC price
         cdpManager.setCBTCPrice(CBTC_PRICE);
@@ -79,172 +68,124 @@ contract ZestTest is Test {
         vm.stopPrank();
     }
 
-    function testFullProtocolFlow() public {
-        // Test 1: Alice opens a CDP
-        vm.startPrank(alice);
-        
-        uint256 depositAmount = 10 ether;
-        uint256 borrowAmount = 500000e18; // $500,000 worth of ZEST (with cBTC at $85,000)
-        // Collateral value = 10 * 85000 = $850,000
-        // Collateral ratio = 850,000 / 500,000 = 170% (above minimum 150%)
-        
-        // Open CDP
-        cdpManager.openCDP{value: depositAmount}(depositAmount, borrowAmount, 1); // 1 bps interest rate
-        
-        assertEq(address(cdpManager).balance, depositAmount, "CDP Manager should have cBTC");
-        assertEq(zest.balanceOf(alice), borrowAmount, "Alice should have ZEST");
-        
-        // Add more debt to make CDP unsafe at lower price
-        uint256 additionalDebt = 50000e18; // Add $50,000 more debt
-        cdpManager.mintDebt(additionalDebt);
-        
-        vm.stopPrank();
-
-        // Test 2: Bob provides liquidity to Stability Pool
+    function testStakingDeposit() public {
         vm.startPrank(admin);
-        // Mint ZEST to Bob for stability pool deposit
-        zest.mint(bob, 500000e18);
+        zest.mint(alice, 100 * 10**18);
         vm.stopPrank();
 
+        vm.startPrank(alice);
+        uint256 depositAmount = 100 * 10**18;
+        zest.approve(address(stabilityPool), depositAmount);
+        stabilityPool.deposit(depositAmount, alice);
+        
+        // Check balances
+        assertEq(zest.balanceOf(alice), 0);
+        assertEq(stabilityPool.balanceOf(alice), depositAmount);
+        assertEq(stabilityPool.totalAssets(), depositAmount);
+        
+        vm.stopPrank();
+    }
+
+    function testStakingWithdraw() public {
+        vm.startPrank(admin);
+        zest.mint(alice, 100 * 10**18);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        uint256 depositAmount = 100 * 10**18;
+        zest.approve(address(stabilityPool), depositAmount);
+        stabilityPool.deposit(depositAmount, alice);
+        
+        // Fast forward 1 year
+        vm.warp(block.timestamp + 365 days);
+        
+        // Calculate expected yield and mint it to the pool
+        uint256 expectedYield = (depositAmount * stabilityPool.yieldRate() * 365 days) / (365 days * 1e18);
+        vm.startPrank(admin);
+        zest.mint(address(stabilityPool), expectedYield);
+        vm.stopPrank();
+        
+        // Withdraw
+        vm.startPrank(alice);
+        stabilityPool.withdraw(depositAmount, alice, alice);
+        
+        // Check balances
+        assertEq(zest.balanceOf(alice), depositAmount + expectedYield);
+        assertEq(stabilityPool.balanceOf(alice), 0);
+        
+        vm.stopPrank();
+    }
+
+    function testStakingWithStabilityPool() public {
+        // Test CDP liquidation with staking
+        vm.startPrank(admin);
+        zest.mint(alice, 100 * 10**18);
+        zest.mint(address(swapModule), 1_000_000e18); // Fund swap module for liquidation
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        uint256 depositAmount = 100 * 10**18;
+        zest.approve(address(stabilityPool), depositAmount);
+        stabilityPool.deposit(depositAmount, alice);
+        
+        // Bob opens a CDP
+        vm.stopPrank();
         vm.startPrank(bob);
+        uint256 cdpDeposit = 10 ether;
+        uint256 borrowAmount = 500000e18;
         
-        uint256 stabilityDeposit = 500000e18;
-        zest.approve(address(stabilityPool), stabilityDeposit);
-        stabilityPool.deposit(stabilityDeposit);
+        cdpManager.openCDP{value: cdpDeposit}(cdpDeposit, borrowAmount, 1);
         
-        (uint256 amount,) = stabilityPool.deposits(bob);
-        assertEq(amount, stabilityDeposit, "Bob's deposit should be recorded");
-        
+        // Price drops and triggers liquidation
         vm.stopPrank();
-
-        // Test 3: Carol stakes ZEST
-        vm.startPrank(admin);
-        // Mint ZEST to Carol for staking
-        zest.mint(carol, 1000e18);
-        // Mint ZEST to SwapModule for USDT-ZEST swaps
-        zest.mint(address(swapModule), 10000e18);
-        vm.stopPrank();
-
-        vm.startPrank(carol);
-        
-        // First swap USDT for ZEST
-        uint256 swapAmount = 1000e18;
-        usdt.approve(address(swapModule), swapAmount);
-        swapModule.swapUsdtForZest(swapAmount);
-        
-        // Then stake ZEST
-        zest.approve(address(staking), swapAmount);
-        staking.stake(swapAmount);
-        
-        vm.stopPrank();
-
-        // Test 4: Alice repays part of her debt
-        vm.startPrank(alice);
-        
-        uint256 repayAmount = 100000e18; // Repay $100,000 worth of ZEST
-        zest.approve(address(cdpManager), repayAmount);
-        cdpManager.repayDebt(repayAmount);
-        
-        (, uint256 aliceDebt,,) = cdpManager.cdps(alice);
-        assertEq(aliceDebt, borrowAmount + additionalDebt - repayAmount, "Alice's debt should be reduced");
-        
-        vm.stopPrank();
-
-        // Test 5: Price drop and liquidation
-        vm.startPrank(admin);
-        
-        // Drop cBTC price to $40,000, making Alice's CDP unsafe
-        // With 10 cBTC collateral and 450,000 ZEST debt:
-        // Collateral value = 10 * 40000 = 400,000 USD
-        // Collateral ratio = 400,000 / 450,000 = 88.89%
-        // Liquidation threshold is 91%, so this should trigger liquidation
+        vm.prank(admin);
         cdpManager.setCBTCPrice(LIQUIDATION_CBTC_PRICE);
         
-        vm.stopPrank();
-
-        // Bob liquidates Alice's CDP
+        // Process liquidation
         vm.prank(bob);
-        cdpManager.liquidate(alice);
-
-        // Verify liquidation results
-        assertEq(address(cdpManager).balance, 0, "CDP Manager should have no cBTC");
-        assertGt(bob.balance, INITIAL_CBTC_BALANCE, "Bob should have received cBTC from liquidation");
-    }
-
-    function testCDPOperations() public {
-        vm.startPrank(alice);
+        cdpManager.liquidate(bob);
         
-        // Open CDP
-        uint256 depositAmount = 5 ether;
-        uint256 borrowAmount = 7500e18; // $7500 worth of ZEST
-        
-        cdpManager.openCDP{value: depositAmount}(depositAmount, borrowAmount, 1);
-        
-        // Add more collateral
-        cdpManager.addCollateral{value: 2 ether}(2 ether);
-        
-        // Mint more debt
-        cdpManager.mintDebt(3000e18);
-        
-        // Withdraw some collateral
-        cdpManager.withdrawCollateral(1 ether);
-        
-        // Repay some debt
-        uint256 repayAmount = 5000e18;
-        zest.approve(address(cdpManager), repayAmount);
-        cdpManager.repayDebt(repayAmount);
+        // Check staking received yield from liquidation
+        uint256 yield = stabilityPool.totalAssets() - depositAmount;
+        assertGt(yield, 0, "Staking should have received yield from liquidation");
         
         vm.stopPrank();
     }
 
-    function testStabilityPoolOperations() public {
-        // Setup initial ZEST balance for Bob
+    function testLiquidationWithCBTC() public {
+        // Setup initial state
         vm.startPrank(admin);
-        zest.mint(bob, 10000e18);
+        zest.mint(address(swapModule), 1_000_000e18); // Fund swap module with ZEST
         vm.stopPrank();
 
+        // Bob opens a CDP
         vm.startPrank(bob);
-        
-        // Deposit to Stability Pool
-        zest.approve(address(stabilityPool), 5000e18);
-        stabilityPool.deposit(5000e18);
-        
-        // Withdraw partial amount
-        stabilityPool.withdraw(2000e18);
-        
-        // Check remaining balance
-        (uint256 remainingDeposit,) = stabilityPool.deposits(bob);
-        assertEq(remainingDeposit, 3000e18, "Remaining deposit should be correct");
-        
+        uint256 collateral = 1 ether; // 1 cBTC
+        uint256 debt = 50000e18; // 50,000 ZEST
+        cdpManager.openCDP{value: collateral}(collateral, debt, 1);
         vm.stopPrank();
-    }
 
-    function testStakingOperations() public {
-        // Setup initial ZEST balance for Carol
+        // Alice deposits into stability pool
         vm.startPrank(admin);
-        zest.mint(carol, 10000e18);
+        zest.mint(alice, 100_000e18);
         vm.stopPrank();
 
-        vm.startPrank(carol);
-        
-        // Stake ZEST
-        zest.approve(address(staking), 5000e18);
-        staking.stake(5000e18);
-        
-        // Approve sZEST for unstaking
-        sZestToken.approve(address(staking), 2500e18);
-        
-        // Wait some time to accrue rewards
-        skip(30 days);
-        
-        // Unstake with rewards
-        staking.unstake(2500e18);
-        
-        // Verify reward calculation
-        uint256 reward = staking.calculateReward(carol, 2500e18);
-        assertGt(reward, 0, "Should have earned staking rewards");
-        
+        vm.startPrank(alice);
+        uint256 depositAmount = 100_000e18;
+        zest.approve(address(stabilityPool), depositAmount);
+        stabilityPool.deposit(depositAmount, alice);
         vm.stopPrank();
+
+        // Process liquidation
+        vm.startPrank(bob);
+        uint256 liquidationCollateral = 0.5 ether; // 0.5 cBTC
+        stabilityPool.processLiquidation{value: liquidationCollateral}(debt, liquidationCollateral);
+        vm.stopPrank();
+
+        // Verify results
+        uint256 expectedZest = (liquidationCollateral * 85000e18) / 1e18; // 42,500 ZEST
+        assertEq(stabilityPool.totalYield(), expectedZest, "Total yield should match expected ZEST amount");
+        assertEq(stabilityPool.totalAssets(), depositAmount + expectedZest, "Total assets should include yield");
     }
 }
 

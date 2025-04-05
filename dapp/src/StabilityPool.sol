@@ -1,153 +1,197 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "../interfaces/IZest.sol";
+import "../src/SwapModule.sol";
 
 /**
  * @title StabilityPool
  * @notice Handles liquidations and bonus distribution using cBTC as collateral
  */
-contract StabilityPool is ReentrancyGuard, AccessControl {
-    using SafeERC20 for IERC20;
+contract StabilityPool is ERC4626, AccessControl, ReentrancyGuard {
+    using Math for uint256;
 
     bytes32 public constant CDP_ROLE = keccak256("CDP_ROLE");
-    
-    IERC20 public immutable zestToken;
-    
-    // Liquidation bonus (5%)
-    uint256 public constant BONUS_PERCENTAGE = 5;
-    
-    struct Deposit {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    uint256 public constant YIELD_RATE = 5e16; // 5% APY
+    uint256 public lastUpdate;
+    uint256 public totalDeposited;
+    uint256 public totalYield;
+
+    SwapModule public swapModule;
+
+    struct UserDeposit {
         uint256 amount;
         uint256 timestamp;
-    }
-    
-    mapping(address => Deposit) public deposits;
-    mapping(uint256 => address) public depositorList;
-    uint256 public depositorCount;
-    uint256 public totalDeposits;
-
-    event DepositMade(address indexed depositor, uint256 amount);
-    event DepositWithdrawn(address indexed depositor, uint256 amount);
-    event LiquidationProcessed(uint256 debt, uint256 collateral);
-    event BonusDistributed(address indexed receiver, uint256 amount);
-
-    constructor(address _zestToken) {
-        zestToken = IERC20(_zestToken);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(CDP_ROLE, msg.sender);
+        uint256 lastYieldUpdate;
     }
 
-    /**
-     * @notice Deposit ZEST tokens into stability pool
-     * @param amount Amount to deposit
-     */
-    function deposit(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be > 0");
-        
-        if (deposits[msg.sender].amount == 0) {
-            depositorList[depositorCount] = msg.sender;
-            depositorCount++;
-        }
-        
-        deposits[msg.sender].amount += amount;
-        deposits[msg.sender].timestamp = block.timestamp;
-        totalDeposits += amount;
-        
-        zestToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit DepositMade(msg.sender, amount);
-    }
+    mapping(address => UserDeposit) public deposits;
+    mapping(address => uint256) public yieldEarned;
 
-    /**
-     * @notice Withdraw ZEST tokens from stability pool
-     * @param amount Amount to withdraw
-     */
-    function withdraw(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be > 0");
-        require(deposits[msg.sender].amount >= amount, "Insufficient deposit");
-        
-        deposits[msg.sender].amount -= amount;
-        totalDeposits -= amount;
-        
-        if (deposits[msg.sender].amount == 0) {
-            _removeDepositor(msg.sender);
-        }
-        
-        zestToken.safeTransfer(msg.sender, amount);
-        emit DepositWithdrawn(msg.sender, amount);
-    }
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event YieldAccrued(address indexed user, uint256 amount);
+    event LiquidationProcessed(address indexed cdp, uint256 debt, uint256 collateral, uint256 yield);
 
-    /**
-     * @notice Process a liquidation, distributing cBTC collateral to depositors
-     * @param debt Amount of debt to be repaid
-     * @param collateral Amount of cBTC collateral to be distributed
-     */
-    function processLiquidation(uint256 debt, uint256 collateral) 
-        external 
-        payable
-        onlyRole(CDP_ROLE) 
-        nonReentrant 
+    constructor(address _zest, address _swapModule) 
+        ERC4626(IERC20(_zest))
+        ERC20("Staked ZEST", "sZEST") 
     {
-        require(msg.value == collateral, "Incorrect cBTC amount sent");
-        require(totalDeposits >= debt, "Insufficient stability pool deposits");
-        
-        // Calculate bonus collateral (5% more)
-        uint256 totalCollateralWithBonus = collateral;
-        uint256 bonusAmount = (collateral * BONUS_PERCENTAGE) / 100;
-        if (bonusAmount > 0) {
-            totalCollateralWithBonus = collateral + bonusAmount;
-        }
-        
-        // Distribute collateral to depositors based on their share
-        for (uint256 i = 0; i < depositorCount; i++) {
-            address depositor = depositorList[i];
-            uint256 userDeposit = deposits[depositor].amount;
-            
-            if (userDeposit > 0) {
-                uint256 share = (userDeposit * collateral) / totalDeposits;
-                if (share > 0) {
-                    (bool success, ) = depositor.call{value: share}("");
-                    require(success, "cBTC transfer failed");
-                    emit BonusDistributed(depositor, share);
+        lastUpdate = block.timestamp;
+        totalDeposited = 0;
+        totalYield = 0;
+        swapModule = SwapModule(_swapModule);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+    }
+
+    function yieldRate() public pure returns (uint256) {
+        return YIELD_RATE;
+    }
+
+    function _updateYield() internal {
+        if (block.timestamp > lastUpdate) {
+            uint256 timeElapsed = block.timestamp - lastUpdate;
+            if (totalDeposited > 0) {
+                uint256 yield = (totalDeposited * YIELD_RATE * timeElapsed) / (365 days * 1e18);
+                if (yield > 0) {
+                    totalYield += yield;
                 }
             }
+            lastUpdate = block.timestamp;
+        }
+    }
+
+    function _updateUserYield(address user) internal {
+        if (deposits[user].amount > 0) {
+            uint256 timeElapsed = block.timestamp - deposits[user].lastYieldUpdate;
+            uint256 userYield = (deposits[user].amount * YIELD_RATE * timeElapsed) / (365 days * 1e18);
+            if (userYield > 0) {
+                yieldEarned[user] += userYield;
+            }
+            deposits[user].lastYieldUpdate = block.timestamp;
+        }
+    }
+
+    function deposit(uint256 assets, address receiver) public override nonReentrant returns (uint256) {
+        require(assets > 0, "Amount must be greater than 0");
+        
+        _updateYield();
+        _updateUserYield(receiver);
+        
+        // Transfer ZEST from user
+        require(IERC20(asset()).transferFrom(msg.sender, address(this), assets), "Transfer failed");
+        
+        // Update deposit tracking
+        deposits[receiver].amount += assets;
+        deposits[receiver].timestamp = block.timestamp;
+        deposits[receiver].lastYieldUpdate = block.timestamp;
+        totalDeposited += assets;
+        
+        // Mint shares
+        uint256 shares = previewDeposit(assets);
+        _mint(receiver, shares);
+        
+        emit Deposited(receiver, assets);
+        return shares;
+    }
+
+    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {
+        require(assets > 0, "Amount must be greater than 0");
+        require(deposits[owner].amount >= assets, "Insufficient balance");
+        
+        _updateYield();
+        _updateUserYield(owner);
+        
+        // Calculate yield earned
+        uint256 yield = yieldEarned[owner];
+        yieldEarned[owner] = 0;
+        
+        // Update deposit tracking
+        deposits[owner].amount -= assets;
+        totalDeposited -= assets;
+        
+        // Burn shares
+        uint256 shares = previewWithdraw(assets);
+        _burn(owner, shares);
+        
+        // Transfer ZEST and yield back to user
+        require(IERC20(asset()).transfer(receiver, assets + yield), "Transfer failed");
+        
+        emit Withdrawn(owner, assets);
+        if (yield > 0) {
+            emit YieldAccrued(owner, yield);
         }
         
-        emit LiquidationProcessed(debt, collateral);
+        return shares;
     }
 
-    /**
-     * @notice Remove a depositor from the list
-     * @param depositor Address to remove
-     */
-    function _removeDepositor(address depositor) internal {
-        for (uint256 i = 0; i < depositorCount; i++) {
-            if (depositorList[i] == depositor) {
-                if (i != depositorCount - 1) {
-                    depositorList[i] = depositorList[depositorCount - 1];
-                }
-                delete depositorList[depositorCount - 1];
-                depositorCount--;
-                break;
-            }
+    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
+        require(shares > 0, "Amount must be greater than 0");
+        require(balanceOf(owner) >= shares, "Insufficient shares");
+        
+        _updateYield();
+        _updateUserYield(owner);
+        
+        // Calculate assets and yield
+        uint256 assets = previewRedeem(shares);
+        uint256 yield = yieldEarned[owner];
+        yieldEarned[owner] = 0;
+        
+        // Update deposit tracking
+        deposits[owner].amount -= assets;
+        totalDeposited -= assets;
+        
+        // Burn shares
+        _burn(owner, shares);
+        
+        // Transfer ZEST and yield back to user
+        require(IERC20(asset()).transfer(receiver, assets + yield), "Transfer failed");
+        
+        emit Withdrawn(owner, assets);
+        if (yield > 0) {
+            emit YieldAccrued(owner, yield);
         }
+        
+        return assets;
     }
 
-    /**
-     * @notice Get all active depositors
-     * @return Array of depositor addresses
-     */
-    function getDepositors() external view returns (address[] memory) {
-        address[] memory activeDepositors = new address[](depositorCount);
-        for (uint256 i = 0; i < depositorCount; i++) {
-            activeDepositors[i] = depositorList[i];
-        }
-        return activeDepositors;
+    function processLiquidation(uint256 debt, uint256 collateral) external payable onlyRole(CDP_ROLE) {
+        require(msg.value == collateral, "Incorrect collateral amount");
+        require(debt > 0, "Debt must be greater than 0");
+        
+        _updateYield();
+        
+        // Convert cBTC to ZEST using SwapModule
+        uint256 zestReceived = swapModule.swapCbtcToZest{value: collateral}(collateral);
+        
+        // Add received ZEST to total yield
+        totalYield += zestReceived;
+        
+        emit LiquidationProcessed(msg.sender, debt, collateral, zestReceived);
     }
 
-    // Function to receive cBTC
-    receive() external payable {}
+    function getYield(address user, uint256 timeElapsed) public view returns (uint256) {
+        if (deposits[user].amount == 0) return 0;
+        return (deposits[user].amount * YIELD_RATE * timeElapsed) / (365 days * 1e18);
+    }
+
+    function totalAssets() public view override returns (uint256) {
+        return totalDeposited + totalYield;
+    }
+
+    function balanceOf(address account) public view override(ERC20, IERC20) returns (uint256) {
+        return deposits[account].amount;
+    }
+
+    function totalSupply() public view override(ERC20, IERC20) returns (uint256) {
+        return totalDeposited;
+    }
 }
