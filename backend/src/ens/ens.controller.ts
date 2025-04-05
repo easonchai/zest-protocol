@@ -19,8 +19,8 @@ export class ENSController {
   @ApiResponse({ status: 200, description: 'Returns the resolved address.' })
   @ApiParam({
     name: 'name',
-    description: 'The ENS name to resolve (e.g., "vitalik.eth")',
-    example: 'vitalik.eth',
+    description: 'The ENS name to resolve (e.g., "vitalik.zest")',
+    example: 'vitalik.zest',
   })
   async resolveName(@Param('name') name: string) {
     return this.ensService.resolveName(name);

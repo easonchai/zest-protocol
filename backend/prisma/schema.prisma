@@ -117,3 +117,14 @@ model KYCVerification {
   @@index([address])
   @@index([status])
 }
+
+model ENSName {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  owner     String
+  txHash    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([owner])
+}
