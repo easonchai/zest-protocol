@@ -34,10 +34,12 @@ model StabilityDeposit {
   id        String   @id @default(uuid())
   depositor String // wallet address
   amount    Float // amount of ZEST
+  txHash    String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([depositor])
+  @@index([txHash])
 }
 
 // Track staking positions
