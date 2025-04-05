@@ -123,7 +123,7 @@ export function SendForm() {
 
   return (
     <div className="max-w-md mx-auto px-4">
-      <div className="border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+      <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         {/* Main Card */}
         <div className="p-6 space-y-6">
           {/* Send To Section */}
@@ -136,11 +136,11 @@ export function SendForm() {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 p-3 border border-[#E5E5E5] rounded-lg bg-white">
+            <div className="flex flex-wrap items-center gap-2 p-3 border border-[#E5E5E5] rounded-sm bg-white">
               {recipients.map((recipient) => (
                 <div
                   key={recipient.id}
-                  className="flex items-center bg-[#FED5C8] text-[#2A2A2A] px-2 py-1 rounded"
+                  className="flex items-center bg-[#FED5C8] text-[#2A2A2A] px-2 py-1 rounded-xs"
                 >
                   <span>{recipient.name}</span>
                   <button
@@ -172,7 +172,7 @@ export function SendForm() {
           </div>
 
           {/* You Send Section */}
-          <div className="bg-[#FBFBFB] rounded-xl p-5">
+          <div className="bg-[#FBFBFB] rounded-sm p-5">
             <div className="text-[#827A77] mb-1 text-sm">You send</div>
             <div className="flex justify-between">
               <div className="flex flex-col">
@@ -207,7 +207,7 @@ export function SendForm() {
           </div>
 
           {/* Confirm Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-xl">
+          <Button className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm">
             Confirm payment
           </Button>
         </div>
