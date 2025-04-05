@@ -1,6 +1,7 @@
 import type { AppProps } from "next/app";
 import { Inter } from "next/font/google";
 import "@/styles/globals.css";
+import { WalletProvider } from "@/providers/wallet-provider";
 
 // Initialize Inter font
 const inter = Inter({
@@ -10,8 +11,10 @@ const inter = Inter({
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <div className={`${inter.variable} font-sans`}>
-      <Component {...pageProps} />
-    </div>
+    <WalletProvider>
+      <div className={`${inter.variable} font-sans`}>
+        <Component {...pageProps} />
+      </div>
+    </WalletProvider>
   );
 }
