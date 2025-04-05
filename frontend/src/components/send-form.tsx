@@ -39,12 +39,48 @@ export function SendForm() {
   const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>(
     undefined
   );
+  const [transferHash, setTransferHash] = useState<`0x${string}` | undefined>(
+    undefined
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: approvalReceipt, isSuccess: isApprovalSuccess } =
     useWaitForTransactionReceipt({
       hash: approvalHash,
     });
+
+  const { data: transferReceipt, isSuccess: isTransferSuccess } =
+    useWaitForTransactionReceipt({
+      hash: transferHash,
+    });
+
+  useEffect(() => {
+    if (isTransferSuccess && transferReceipt) {
+      // Clear all inputs and state
+      setSendAmount("0.00");
+      setInputValue("");
+      setSuggestedValue("");
+      setRecipients([]);
+      setApprovalHash(undefined);
+      setTransferHash(undefined);
+      setIsApproving(false);
+      setIsSending(false);
+
+      // Show success message
+      toast.success("Payment sent successfully!");
+
+      // Refresh balance
+      const refreshBalance = async () => {
+        try {
+          const newBalances = await getBalance(address!);
+          setBalance(newBalances.zest);
+        } catch (error) {
+          console.error("Error updating balance:", error);
+        }
+      };
+      refreshBalance();
+    }
+  }, [isTransferSuccess, transferReceipt, address]);
 
   useEffect(() => {
     if (isApprovalSuccess && approvalReceipt && recipients.length > 0) {
@@ -109,18 +145,8 @@ export function SendForm() {
   const { writeContract: writeTransfer, isPending: isSendingPending } =
     useWriteContract({
       mutation: {
-        onSuccess: async () => {
-          try {
-            toast.success("Payment sent successfully!");
-            // Refresh balance
-            const newBalances = await getBalance(address!);
-            setBalance(newBalances.zest);
-          } catch (error) {
-            console.error("Error updating balance:", error);
-          } finally {
-            setIsSending(false);
-            setApprovalHash(undefined);
-          }
+        onSuccess: (hash) => {
+          setTransferHash(hash);
         },
         onError: (error) => {
           console.error("Error sending payment:", error);
@@ -129,6 +155,7 @@ export function SendForm() {
           );
           setIsSending(false);
           setApprovalHash(undefined);
+          setTransferHash(undefined);
         },
       },
     });
