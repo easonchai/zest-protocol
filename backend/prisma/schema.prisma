@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Track CDP positions
+model CDP {
+  id           String   @id @default(uuid())
+  owner        String // wallet address
+  collateral   Float // amount of cBTC
+  debt         Float // amount of ZEST
+  interestRate Float // in basis points per second
+  lastAccrual  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isLiquidated Boolean  @default(false)
+
+  @@index([owner])
+}
+
+// Track Stability Pool deposits
+model StabilityDeposit {
+  id        String   @id @default(uuid())
+  depositor String // wallet address
+  amount    Float // amount of ZEST
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([depositor])
+}
+
+// Track staking positions
+model Stake {
+  id          String   @id @default(uuid())
+  staker      String // wallet address
+  amount      Float // amount of ZEST
+  sZestAmount Float // amount of sZEST
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([staker])
+}
+
+// Track protocol statistics
+model ProtocolStats {
+  id                 String   @id @default(uuid())
+  totalCollateral    Float    @default(0)
+  totalDebt          Float    @default(0)
+  totalStabilityPool Float    @default(0)
+  totalStaked        Float    @default(0)
+  cbtcPrice          Float    @default(0)
+  updatedAt          DateTime @updatedAt
+}
+
+// Track transactions
+model Transaction {
+  id        String   @id @default(uuid())
+  type      String // CDP_OPEN, CDP_CLOSE, DEPOSIT, WITHDRAW, STAKE, UNSTAKE, etc.
+  from      String // wallet address
+  to        String? // wallet address (optional)
+  amount    Float
+  txHash    String   @unique
+  status    String // PENDING, COMPLETED, FAILED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([from, to])
+  @@index([txHash])
+}
