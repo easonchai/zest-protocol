@@ -16,12 +16,33 @@ export class StabilityPoolService {
 
     // Prepare transaction data
     const iface = new ethers.Interface(this.blockchain.stabilityPoolABI);
-    const data = iface.encodeFunctionData('deposit', [amount]);
+    const data = iface.encodeFunctionData('deposit', [
+      amount,
+      createDepositDto.depositor,
+    ]);
 
     return {
       to: this.blockchain.stabilityPoolContract,
       data,
       value: '0', // No ETH value needed
+    };
+  }
+
+  prepareWithdraw(amount: string, receiver: string, owner: string) {
+    const withdrawAmount = ethers.parseEther(amount);
+
+    // Prepare transaction data
+    const iface = new ethers.Interface(this.blockchain.stabilityPoolABI);
+    const data = iface.encodeFunctionData('withdraw', [
+      withdrawAmount,
+      receiver,
+      owner,
+    ]);
+
+    return {
+      to: this.blockchain.stabilityPoolContract,
+      data,
+      value: '0',
     };
   }
 
@@ -33,12 +54,16 @@ export class StabilityPoolService {
     if (!deposit) return null;
 
     // Get on-chain data
-    const onChainDeposit =
-      await this.blockchain.getStabilityPoolDeposit(depositor);
+    const [onChainDeposit, yield_] = await Promise.all([
+      this.blockchain.getStabilityPoolDeposit(depositor),
+      this.blockchain.getStabilityPoolYield(depositor),
+    ]);
 
     return {
       ...deposit,
-      onChainAmount: ethers.formatEther(onChainDeposit),
+      onChainAmount: ethers.formatEther(onChainDeposit.amount),
+      yield: ethers.formatEther(yield_),
+      lastYieldUpdate: new Date(Number(onChainDeposit.lastYieldUpdate) * 1000),
     };
   }
 
@@ -65,6 +90,23 @@ export class StabilityPoolService {
   async getTotalDeposits() {
     const total = await this.blockchain.getTotalStabilityPoolDeposits();
     return ethers.formatEther(total);
+  }
+
+  async getTotalYield() {
+    const total = await this.blockchain.getTotalStabilityPoolYield();
+    return ethers.formatEther(total);
+  }
+
+  async getSharePrice() {
+    const sharePrice = await this.blockchain.getStabilityPoolSharePrice();
+    return ethers.formatEther(sharePrice);
+  }
+
+  async calculateSZESTAmount(zestAmount: string) {
+    const sharePrice = await this.blockchain.getStabilityPoolSharePrice();
+    const amount = ethers.parseEther(zestAmount);
+    const sZESTAmount = (amount * BigInt(1e18)) / BigInt(sharePrice);
+    return ethers.formatEther(sZESTAmount);
   }
 
   recordDeposit(createDepositDto: CreateStabilityDepositDto, txHash: string) {

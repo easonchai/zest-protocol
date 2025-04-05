@@ -43,6 +43,43 @@ export class StabilityPoolController {
     return this.stabilityPoolService.prepareDeposit(createDepositDto);
   }
 
+  @Post('prepare-withdraw')
+  @ApiOperation({ summary: 'Prepare a stability pool withdrawal transaction' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns transaction data for frontend to execute.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        amount: {
+          type: 'string',
+          description: 'Amount of ZEST to withdraw',
+          example: '1000',
+        },
+        receiver: {
+          type: 'string',
+          description: 'Address to receive the withdrawn ZEST',
+          example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        },
+        owner: {
+          type: 'string',
+          description: 'Owner of the deposit',
+          example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        },
+      },
+      required: ['amount', 'receiver', 'owner'],
+    },
+  })
+  prepareWithdraw(
+    @Body('amount') amount: string,
+    @Body('receiver') receiver: string,
+    @Body('owner') owner: string,
+  ) {
+    return this.stabilityPoolService.prepareWithdraw(amount, receiver, owner);
+  }
+
   @Post('record')
   @ApiOperation({ summary: 'Record a completed deposit transaction' })
   @ApiResponse({ status: 201, description: 'Deposit recorded successfully.' })
@@ -115,5 +152,34 @@ export class StabilityPoolController {
   @ApiResponse({ status: 200, description: 'Returns the total deposits.' })
   async getTotalDeposits() {
     return await this.stabilityPoolService.getTotalDeposits();
+  }
+
+  @Get('total/yield')
+  @ApiOperation({ summary: 'Get total yield in the stability pool' })
+  @ApiResponse({ status: 200, description: 'Returns the total yield.' })
+  async getTotalYield() {
+    return await this.stabilityPoolService.getTotalYield();
+  }
+
+  @Get('share/price')
+  @ApiOperation({ summary: 'Get current share price of sZEST' })
+  @ApiResponse({ status: 200, description: 'Returns the current share price.' })
+  async getSharePrice() {
+    return await this.stabilityPoolService.getSharePrice();
+  }
+
+  @Get('calculate-szest/:amount')
+  @ApiOperation({ summary: 'Calculate sZEST amount for a given ZEST stake' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the calculated sZEST amount.',
+  })
+  @ApiParam({
+    name: 'amount',
+    description: 'Amount of ZEST to stake',
+    example: '1000',
+  })
+  async calculateSZESTAmount(@Param('amount') amount: string) {
+    return await this.stabilityPoolService.calculateSZESTAmount(amount);
   }
 }

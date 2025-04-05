@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import * as CDPManagerABI from './abi/CDPManager.json';
 import * as StabilityPoolABI from './abi/StabilityPool.json';
-import * as StakingABI from './abi/Staking.json';
 import * as SwapABI from './abi/SwapModule.json';
 
 @Injectable()
@@ -13,11 +12,9 @@ export class BlockchainService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
   public cdpManagerContract: string;
   public stabilityPoolContract: string;
-  public stakingContract: string;
   public swapContract: string;
   public cdpManagerABI = CDPManagerABI.abi;
   public stabilityPoolABI = StabilityPoolABI.abi;
-  public stakingABI = StakingABI.abi;
   public swapABI = SwapABI.abi;
 
   constructor(private configService: ConfigService) {
@@ -32,8 +29,6 @@ export class BlockchainService implements OnModuleInit {
       this.configService.get<string>('CDPMANAGER_CONTRACT') || '';
     this.stabilityPoolContract =
       this.configService.get<string>('STABILITYPOOL_CONTRACT') || '';
-    this.stakingContract =
-      this.configService.get<string>('STAKING_CONTRACT') || '';
     this.swapContract = this.configService.get<string>('SWAP_CONTRACT') || '';
   }
 
@@ -62,25 +57,36 @@ export class BlockchainService implements OnModuleInit {
       this.stabilityPoolABI,
       this.provider,
     );
-    return stabilityPool.totalDeposits();
+    return stabilityPool.totalDeposited();
   }
 
-  async getStake(staker: string) {
-    const contract = new ethers.Contract(
-      this.stakingContract,
-      this.stakingABI,
+  async getStabilityPoolYield(depositor: string) {
+    const stabilityPool = new ethers.Contract(
+      this.stabilityPoolContract,
+      this.stabilityPoolABI,
       this.provider,
     );
-    return contract.getStake(staker);
+    return stabilityPool.yieldEarned(depositor);
   }
 
-  async calculateStakingReward(staker: string) {
-    const contract = new ethers.Contract(
-      this.stakingContract,
-      this.stakingABI,
+  async getTotalStabilityPoolYield() {
+    const stabilityPool = new ethers.Contract(
+      this.stabilityPoolContract,
+      this.stabilityPoolABI,
       this.provider,
     );
-    return contract.calculateReward(staker);
+    return stabilityPool.totalYield();
+  }
+
+  async getStabilityPoolSharePrice() {
+    const stabilityPool = new ethers.Contract(
+      this.stabilityPoolContract,
+      this.stabilityPoolABI,
+      this.provider,
+    );
+    const totalAssets = await stabilityPool.totalAssets();
+    const totalSupply = await stabilityPool.totalSupply();
+    return totalAssets / totalSupply;
   }
 
   async getSwapOutputAmount(

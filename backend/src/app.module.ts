@@ -6,7 +6,6 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { CDPModule } from './cdp/cdp.module';
 import { StabilityPoolModule } from './stability-pool/stability-pool.module';
-import { StakingModule } from './staking/staking.module';
 import { SwapModule } from './swap/swap.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { PriceFeedModule } from './price-feed/price-feed.module';
@@ -31,7 +30,6 @@ import { KYCModule } from './kyc/kyc.module';
     PriceFeedModule,
     CDPModule,
     StabilityPoolModule,
-    StakingModule,
     SwapModule,
     TransactionModule,
     PaymentModule,

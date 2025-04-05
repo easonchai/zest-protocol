@@ -24,7 +24,7 @@ import {
   PaymentPaginationDto,
 } from './dto/payment.dto';
 
-@ApiTags('payment')
+@ApiTags('Payments')
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
