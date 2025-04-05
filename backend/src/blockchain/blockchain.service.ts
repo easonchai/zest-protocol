@@ -11,10 +11,14 @@ import * as SwapABI from './abi/SwapModule.json';
 @Injectable()
 export class BlockchainService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
-  private cdpManager: ethers.Contract;
-  private stabilityPool: ethers.Contract;
-  private staking: ethers.Contract;
-  private swap: ethers.Contract;
+  public cdpManagerContract: string;
+  public stabilityPoolContract: string;
+  public stakingContract: string;
+  public swapContract: string;
+  public cdpManagerABI = CDPManagerABI.abi;
+  public stabilityPoolABI = StabilityPoolABI.abi;
+  public stakingABI = StakingABI.abi;
+  public swapABI = SwapABI.abi;
 
   constructor(private configService: ConfigService) {
     this.provider = new ethers.JsonRpcProvider(
@@ -23,64 +27,73 @@ export class BlockchainService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Initialize contract instances
-    this.cdpManager = new ethers.Contract(
-      this.configService.get<string>('CDPMANAGER_CONTRACT') || '',
-      CDPManagerABI.abi,
-      this.provider,
-    );
-
-    this.stabilityPool = new ethers.Contract(
-      this.configService.get<string>('STABILITYPOOL_CONTRACT') || '',
-      StabilityPoolABI.abi,
-      this.provider,
-    );
-
-    this.staking = new ethers.Contract(
-      this.configService.get<string>('STAKING_CONTRACT') || '',
-      StakingABI.abi,
-      this.provider,
-    );
-
-    this.swap = new ethers.Contract(
-      this.configService.get<string>('SWAP_CONTRACT') || '',
-      SwapABI.abi,
-      this.provider,
-    );
+    // Store contract addresses
+    this.cdpManagerContract =
+      this.configService.get<string>('CDPMANAGER_CONTRACT') || '';
+    this.stabilityPoolContract =
+      this.configService.get<string>('STABILITYPOOL_CONTRACT') || '';
+    this.stakingContract =
+      this.configService.get<string>('STAKING_CONTRACT') || '';
+    this.swapContract = this.configService.get<string>('SWAP_CONTRACT') || '';
   }
 
-  // CDP Manager functions
-  async createCDP(collateral: number, debt: number, interestRate: number) {
-    return this.cdpManager.openCDP(
-      ethers.parseEther(collateral.toString()),
-      ethers.parseEther(debt.toString()),
-      interestRate,
-    );
-  }
-
+  // Read-only functions that don't require transactions
   async getCDPDetails(owner: string) {
-    return this.cdpManager.cdps(owner);
+    const contract = new ethers.Contract(
+      this.cdpManagerContract,
+      this.cdpManagerABI,
+      this.provider,
+    );
+    return contract.getCDP(owner);
   }
 
-  // Stability Pool functions
   async getStabilityPoolDeposit(depositor: string) {
-    return this.stabilityPool.deposits(depositor);
+    const stabilityPool = new ethers.Contract(
+      this.stabilityPoolContract,
+      this.stabilityPoolABI,
+      this.provider,
+    );
+    return stabilityPool.deposits(depositor);
   }
 
   async getTotalStabilityPoolDeposits() {
-    return this.stabilityPool.totalDeposits();
-  }
-
-  // Staking functions
-  async getStake(staker: string) {
-    return this.staking.stakes(staker);
-  }
-
-  async calculateStakingReward(staker: string, amount: number) {
-    return this.staking.calculateReward(
-      staker,
-      ethers.parseEther(amount.toString()),
+    const stabilityPool = new ethers.Contract(
+      this.stabilityPoolContract,
+      this.stabilityPoolABI,
+      this.provider,
     );
+    return stabilityPool.totalDeposits();
+  }
+
+  async getStake(staker: string) {
+    const contract = new ethers.Contract(
+      this.stakingContract,
+      this.stakingABI,
+      this.provider,
+    );
+    return contract.getStake(staker);
+  }
+
+  async calculateStakingReward(staker: string) {
+    const contract = new ethers.Contract(
+      this.stakingContract,
+      this.stakingABI,
+      this.provider,
+    );
+    return contract.calculateReward(staker);
+  }
+
+  async getSwapOutputAmount(
+    fromToken: string,
+    toToken: string,
+    amount: bigint,
+  ) {
+    const contract = new ethers.Contract(
+      this.swapContract,
+      this.swapABI,
+      this.provider,
+    );
+    return contract.getOutputAmount(fromToken, toToken, amount);
   }
 
   // Price feed (mocked for hackathon)
@@ -88,6 +101,11 @@ export class BlockchainService implements OnModuleInit {
     if (this.configService.get<boolean>('MOCK_PRICE_FEED')) {
       return 85000; // $85,000 per cBTC
     }
-    return this.cdpManager.cBTCPrice();
+    const cdpManager = new ethers.Contract(
+      this.cdpManagerContract,
+      this.cdpManagerABI,
+      this.provider,
+    );
+    return cdpManager.cBTCPrice();
   }
 }
