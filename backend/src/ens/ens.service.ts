@@ -1,19 +1,39 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import * as L2RegistrarABI from './abi/L2Registrar.json';
 
 @Injectable()
 export class ENSService implements OnModuleInit {
   private ensProvider: ethers.JsonRpcProvider;
-  constructor(private configService: ConfigService) {
+  private l2Registrar: ethers.Contract;
+  private l2RegistrarAddress: string;
+  private signer: ethers.Wallet;
+
+  constructor(
+    private configService: ConfigService,
+    @InjectQueue('ens') private ensQueue: Queue,
+  ) {
     // Base sepolia provider for ENS
     this.ensProvider = new ethers.JsonRpcProvider(
       this.configService.get<string>('RPC_URL'),
     );
+    this.l2RegistrarAddress =
+      this.configService.get<string>('L2_REGISTRAR_CONTRACT') || '';
+    this.signer = new ethers.Wallet(
+      this.configService.get<string>('PRIVATE_KEY') || '',
+      this.ensProvider,
+    );
   }
 
-  async onModuleInit() {
-    // No initialization needed
+  onModuleInit() {
+    this.l2Registrar = new ethers.Contract(
+      this.l2RegistrarAddress,
+      L2RegistrarABI.abi,
+      this.signer,
+    );
   }
 
   async resolveName(name: string): Promise<string | null> {
@@ -56,6 +76,30 @@ export class ENSService implements OnModuleInit {
     } catch (error) {
       console.error('Error getting ENS text record:', error);
       return null;
+    }
+  }
+
+  async registerName(label: string, owner: string) {
+    try {
+      // Check if name is available
+      const isAvailable = await this.l2Registrar.available(label);
+      if (!isAvailable) {
+        throw new Error('Name is not available');
+      }
+
+      // Add to queue
+      await this.ensQueue.add('register', {
+        label,
+        owner,
+      });
+
+      return {
+        status: 'queued',
+        message: 'Name registration has been queued',
+      };
+    } catch (error) {
+      console.error('Error preparing ENS registration:', error);
+      throw error;
     }
   }
 }
