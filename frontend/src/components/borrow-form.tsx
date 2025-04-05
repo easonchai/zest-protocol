@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useAccount, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { Button } from "@/components/ui/button";
 import { BitcoinIcon } from "./btc-token-icon";
 import { ZestTokenIcon } from "./zest-token-icon";
@@ -9,10 +13,15 @@ import { getBalance, getBtcPrice, prepareCDP, recordCDP } from "@/utils/api";
 import { ethers } from "ethers";
 import InterestSlider from "./interest-slider";
 import { toast } from "sonner";
+import { parseEther } from "viem";
 
 export function BorrowForm() {
   const { address } = useAccount();
   const { writeContract, isPending } = useWriteContract();
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const { data: receipt, error: receiptError } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
   const [collateralAmount, setCollateralAmount] = useState("0.02");
   const [mintAmount, setMintAmount] = useState("0");
   const [interestRate, setInterestRate] = useState(5.3);
@@ -138,6 +147,54 @@ export function BorrowForm() {
     }
   }, [mintAmount, interestRate]);
 
+  // Handle transaction receipt
+  useEffect(() => {
+    if (receiptError) {
+      console.error("Transaction failed:", receiptError);
+      toast.error("Transaction failed");
+      setIsProcessing(false);
+      return;
+    }
+
+    if (receipt) {
+      // Transaction confirmed, record CDP
+      const recordCDPAndUpdate = async () => {
+        try {
+          await recordCDP(
+            {
+              owner: address!,
+              collateral: ethers.parseEther(collateralAmount).toString(),
+              debt: ethers.parseEther(mintAmount).toString(),
+              interestRate: Math.round(interestRate * 100),
+            },
+            receipt.transactionHash
+          );
+
+          // Refresh balances
+          const newBalances = await getBalance(address!);
+          setBtcBalance(newBalances.cbtc);
+          setZestBalance(newBalances.zest);
+
+          toast.success("CDP created successfully!");
+        } catch (error) {
+          console.error("Error recording CDP:", error);
+          toast.error("Failed to record CDP");
+        } finally {
+          setIsProcessing(false);
+        }
+      };
+
+      recordCDPAndUpdate();
+    }
+  }, [
+    receipt,
+    receiptError,
+    address,
+    collateralAmount,
+    mintAmount,
+    interestRate,
+  ]);
+
   const handleMaxClick = () => {
     setCollateralAmount(btcBalance);
   };
@@ -163,19 +220,26 @@ export function BorrowForm() {
     try {
       setIsProcessing(true);
 
-      // Convert interest rate to basis points (5.3% -> 530)
-      const interestRateBps = Math.round(interestRate * 100);
+      // Validate inputs
+      if (!collateralAmount || !mintAmount) {
+        throw new Error("Please enter valid amounts");
+      }
 
       // Prepare CDP transaction
       const cdpData = await prepareCDP({
         owner: address,
         collateral: ethers.parseEther(collateralAmount).toString(),
         debt: ethers.parseEther(mintAmount).toString(),
-        interestRate: interestRateBps,
+        interestRate: Math.round(interestRate * 100),
       });
 
+      // Validate CDP data
+      if (!cdpData.to || !cdpData.value) {
+        throw new Error("Invalid CDP data received from server");
+      }
+
       // Send transaction
-      const result = await writeContract({
+      const hash = (await writeContract({
         address: cdpData.to as `0x${string}`,
         abi: [
           {
@@ -192,38 +256,23 @@ export function BorrowForm() {
         ],
         functionName: "openCDP",
         args: [
-          BigInt(cdpData.collateral),
-          BigInt(cdpData.debt),
-          BigInt(cdpData.interestRate),
+          ethers.parseEther(collateralAmount),
+          ethers.parseEther(mintAmount),
+          BigInt(Math.round(interestRate * 100)),
         ],
-        value: BigInt(cdpData.value),
-      });
+        value: parseEther(collateralAmount),
+      })) as `0x${string}` | undefined;
 
-      if (result === undefined) {
-        throw new Error("Transaction failed");
+      if (!hash) {
+        throw new Error("Failed to send transaction");
       }
 
-      // Record CDP in backend
-      await recordCDP(
-        {
-          owner: address,
-          collateral: ethers.parseEther(collateralAmount).toString(),
-          debt: ethers.parseEther(mintAmount).toString(),
-          interestRate: interestRateBps,
-        },
-        result as string
-      );
-
-      // Refresh balances
-      const newBalances = await getBalance(address);
-      setBtcBalance(newBalances.cbtc);
-      setZestBalance(newBalances.zest);
-
-      toast.success("CDP created successfully!");
+      setTxHash(hash);
     } catch (error) {
       console.error("Error creating CDP:", error);
-      toast.error("Failed to create CDP");
-    } finally {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create CDP"
+      );
       setIsProcessing(false);
     }
   };
