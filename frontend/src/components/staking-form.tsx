@@ -72,7 +72,9 @@ export function StakingForm() {
           {/* Total Yield */}
           <div className="bg-[#FFF6F3] rounded-sm p-4 flex justify-between items-center mt-8">
             <div>
-              <div className="text-gray-600 text-sm">Total yield</div>
+              <div className="text-gray-600 text-sm font-medium">
+                Total yield
+              </div>
               <div className="text-sm text-[#F4AA3E] font-bold">+12.5 APY</div>
             </div>
             <div className="flex items-center">
@@ -84,12 +86,12 @@ export function StakingForm() {
           </div>
 
           {/* Info Text */}
-          <div className="text-gray-500 text-sm text-center mt-0.5 mb-4">
+          <div className="text-gray-500 text-sm text-center mt-0.5 mb-6">
             You get 25 sZEST per day by staking 1000 ZEST.
           </div>
 
           {/* Continue Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm">
+          <Button className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm cursor-pointer">
             Continue
           </Button>
         </div>
