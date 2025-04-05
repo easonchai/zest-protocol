@@ -163,12 +163,15 @@ export function BorrowForm() {
     try {
       setIsProcessing(true);
 
+      // Convert interest rate to basis points (5.3% -> 530)
+      const interestRateBps = Math.round(interestRate * 100);
+
       // Prepare CDP transaction
       const cdpData = await prepareCDP({
         owner: address,
-        collateral: collateralAmount,
-        debt: mintAmount,
-        interestRate,
+        collateral: ethers.parseEther(collateralAmount).toString(),
+        debt: ethers.parseEther(mintAmount).toString(),
+        interestRate: interestRateBps,
       });
 
       // Send transaction
@@ -189,11 +192,11 @@ export function BorrowForm() {
         ],
         functionName: "openCDP",
         args: [
-          ethers.parseEther(cdpData.collateral),
-          ethers.parseEther(cdpData.debt),
+          BigInt(cdpData.collateral),
+          BigInt(cdpData.debt),
           BigInt(cdpData.interestRate),
         ],
-        value: ethers.parseEther(cdpData.value),
+        value: BigInt(cdpData.value),
       });
 
       if (result === undefined) {
@@ -203,9 +206,10 @@ export function BorrowForm() {
       // Record CDP in backend
       await recordCDP(
         {
-          collateral: collateralAmount,
-          debt: mintAmount,
-          interestRate,
+          owner: address,
+          collateral: ethers.parseEther(collateralAmount).toString(),
+          debt: ethers.parseEther(mintAmount).toString(),
+          interestRate: interestRateBps,
         },
         result as string
       );
