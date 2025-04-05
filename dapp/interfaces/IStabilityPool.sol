@@ -33,15 +33,13 @@ interface IStabilityPool {
 
     /**
      * @notice Process liquidation of a CDP
-     * @param cdpOwner Address of the CDP owner being liquidated
      * @param debt Amount of debt to be covered
      * @param collateral Amount of collateral to be distributed
      */
     function processLiquidation(
-        address cdpOwner,
         uint256 debt,
         uint256 collateral
-    ) external;
+    ) external payable;
 
     // === View functions ===
 
@@ -64,4 +62,10 @@ interface IStabilityPool {
      * @return Bonus amount of collateral to be distributed
      */
     function calculateBonus(uint256 collateralAmount) external view returns (uint256);
+
+    /**
+     * @notice Get a list of all depositors
+     * @return An array of depositor addresses
+     */
+    function getDepositors() external view returns (address[] memory);
 }
