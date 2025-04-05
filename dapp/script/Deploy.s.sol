@@ -9,15 +9,12 @@ import "../src/SwapModule.sol";
 import "../src/MockUSDT.sol";
 
 contract DeployScript is Script {
-    // Test accounts
-    address public constant BOB = 0x6f1524F5A1152d6b08ef8833E42E4311151e904F;
-
-    // Initial balances for testing
-    uint256 public constant INITIAL_CBTC_BALANCE = 100 ether;
+    // Initial balances for contracts
     uint256 public constant INITIAL_USDT_BALANCE = 1_000_000e18;
     uint256 public constant INITIAL_ZEST_BALANCE = 1_000_000e18;
+    uint256 public constant SWAP_MODULE_BALANCE = 1_000_000e18;
     uint256 public constant STABILITY_POOL_DEPOSIT = 500_000e18;
-    uint256 public constant SWAP_MODULE_BALANCE = 100_000e18;
+    uint256 public constant CBTC_PRICE = 85000e18; // $85,000 per cBTC
 
     function run() external {
         // Retrieve deployer private key from environment
@@ -43,7 +40,10 @@ contract DeployScript is Script {
         console.log("SwapModule deployed to:", address(swapModule));
 
         // Deploy Stability Pool
-        StabilityPool stabilityPool = new StabilityPool(address(zest), address(swapModule));
+        StabilityPool stabilityPool = new StabilityPool(
+            address(zest),
+            address(swapModule)
+        );
         console.log("StabilityPool deployed to:", address(stabilityPool));
 
         // Deploy CDP Manager
@@ -59,21 +59,14 @@ contract DeployScript is Script {
         stabilityPool.grantRole(stabilityPool.CDP_ROLE(), address(cdpManager));
 
         // Set initial cBTC Price
-        cdpManager.setCBTCPrice(85000e18);
+        cdpManager.setCBTCPrice(CBTC_PRICE);
 
-        // Fund test accounts with cBTC
-        vm.deal(admin, INITIAL_CBTC_BALANCE);
-        vm.deal(BOB, INITIAL_CBTC_BALANCE);
-
-        // Mint USDT to test accounts and SwapModule
-        usdt.mint(admin, INITIAL_USDT_BALANCE);
-        usdt.mint(BOB, INITIAL_USDT_BALANCE);
+        // Fund contracts with USDT
         usdt.mint(address(swapModule), INITIAL_USDT_BALANCE);
 
-        // Mint ZEST to test accounts and contracts
-        zest.mint(admin, INITIAL_ZEST_BALANCE);
-        zest.mint(BOB, INITIAL_ZEST_BALANCE);
+        // Fund contracts with ZEST
         zest.mint(address(swapModule), SWAP_MODULE_BALANCE);
+        zest.mint(admin, STABILITY_POOL_DEPOSIT);
 
         // Setup initial deposits
         zest.approve(address(stabilityPool), STABILITY_POOL_DEPOSIT);
@@ -92,12 +85,6 @@ contract DeployScript is Script {
 
         console.log("\nInitial Balances:");
         console.log("-------------------");
-        console.log("Admin cBTC:", INITIAL_CBTC_BALANCE);
-        console.log("Bob cBTC:", INITIAL_CBTC_BALANCE);
-        console.log("Admin USDT:", INITIAL_USDT_BALANCE);
-        console.log("Bob USDT:", INITIAL_USDT_BALANCE);
-        console.log("Admin ZEST:", INITIAL_ZEST_BALANCE);
-        console.log("Bob ZEST:", INITIAL_ZEST_BALANCE);
         console.log("SwapModule USDT:", INITIAL_USDT_BALANCE);
         console.log("SwapModule ZEST:", SWAP_MODULE_BALANCE);
         console.log("StabilityPool ZEST:", STABILITY_POOL_DEPOSIT);
