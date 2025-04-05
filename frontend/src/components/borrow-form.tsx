@@ -196,8 +196,17 @@ export function BorrowForm() {
 
           // Refresh balances
           const newBalances = await getBalance(address!);
-          setBtcBalance(newBalances.cbtc);
-          setZestBalance(newBalances.zest);
+          // Format BTC balance to show 3 decimals
+          const formattedBtcBalance = Number(
+            ethers.formatEther(newBalances.cbtc)
+          ).toFixed(3);
+          // Format ZEST balance to show 2 decimals
+          const formattedZestBalance = Number(
+            ethers.formatEther(newBalances.zest)
+          ).toFixed(2);
+
+          setBtcBalance(formattedBtcBalance);
+          setZestBalance(formattedZestBalance);
 
           toast.success("CDP created successfully!");
         } catch (error) {

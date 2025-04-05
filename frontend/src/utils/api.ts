@@ -237,11 +237,30 @@ export async function checkCDPExists(address: string): Promise<boolean> {
     const response = await fetch(
       `${API_BASE_URL}/cdp/owner/${address.toLowerCase()}`
     );
+
     if (!response.ok) {
-      throw new Error("Failed to check CDP existence");
+      if (response.status === 404) {
+        return false;
+      }
+      throw new Error(`Failed to check CDP existence: ${response.statusText}`);
     }
-    const data = await response.json();
-    return data.collateral > 0; // If collateral is greater than 0, CDP exists
+
+    const text = await response.text();
+    if (!text) {
+      return false;
+    }
+
+    try {
+      const data = JSON.parse(text);
+      return (
+        data !== null &&
+        typeof data.collateral === "number" &&
+        data.collateral > 0
+      );
+    } catch (parseError) {
+      console.error("Error parsing CDP response:", parseError);
+      return false;
+    }
   } catch (error) {
     console.error("Error checking CDP existence:", error);
     return false;
