@@ -86,7 +86,7 @@ export class BlockchainService implements OnModuleInit {
     );
     const totalAssets = await stabilityPool.totalAssets();
     const totalSupply = await stabilityPool.totalSupply();
-    return totalAssets / totalSupply;
+    return (BigInt(totalAssets) * BigInt(10 ** 18)) / BigInt(totalSupply);
   }
 
   async getSwapOutputAmount(
