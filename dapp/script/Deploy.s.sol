@@ -64,6 +64,9 @@ contract DeployScript is Script {
         // Fund contracts with USDT
         usdt.mint(address(swapModule), INITIAL_USDT_BALANCE);
 
+        usdt.mint(admin, INITIAL_USDT_BALANCE);
+        zest.mint(admin, INITIAL_ZEST_BALANCE);
+
         // Fund contracts with ZEST
         zest.mint(address(swapModule), SWAP_MODULE_BALANCE);
         zest.mint(admin, STABILITY_POOL_DEPOSIT);
