@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ENSService } from '../ens/ens.service';
@@ -97,8 +98,6 @@ export class PaymentService {
     // Create QR data
     const qrData = JSON.stringify({
       requestId: paymentRequest.id,
-      amount: request.amount,
-      token: request.token,
       expiresAt,
     });
 
@@ -109,7 +108,7 @@ export class PaymentService {
     };
   }
 
-  async preparePayment(requestId: string, fromAddress: string) {
+  async preparePayment(requestId: string) {
     const paymentRequest = await this.prisma.paymentRequest.findUnique({
       where: { id: requestId },
     });
@@ -126,7 +125,28 @@ export class PaymentService {
       throw new Error('Payment request has expired');
     }
 
-    const resolvedFromAddress = await this.resolveAddress(fromAddress);
+    if (!paymentRequest.fromAddress) {
+      throw new Error('Payment request has no from address');
+    }
+
+    const resolvedFromAddress = await this.resolveAddress(
+      paymentRequest.fromAddress!,
+    );
+
+    // Try to resolve ENS name
+    let ensName: string | undefined;
+    try {
+      const resolvedName =
+        await this.ensService.lookupAddress(resolvedFromAddress);
+      if (resolvedName) {
+        ensName = resolvedName;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve ENS name for address ${resolvedFromAddress}: ${error.message}`,
+      );
+    }
+
     const amount = ethers.parseEther(paymentRequest.amount);
 
     // Prepare transaction based on token type
@@ -135,7 +155,7 @@ export class PaymentService {
       case 'cBTC':
         transactionData = {
           to: resolvedFromAddress,
-          value: amount.toString(), // Convert BigInt to string
+          value: amount.toString(),
           data: '0x',
         };
         break;
@@ -144,7 +164,7 @@ export class PaymentService {
           to: this.configService.get<string>('ZEST_CONTRACT'),
           data: this.erc20Iface.encodeFunctionData('transfer', [
             resolvedFromAddress,
-            amount.toString(), // Convert BigInt to string
+            amount.toString(),
           ]),
           value: '0',
         };
@@ -154,7 +174,7 @@ export class PaymentService {
           to: this.configService.get<string>('USDT_CONTRACT'),
           data: this.erc20Iface.encodeFunctionData('transfer', [
             resolvedFromAddress,
-            amount.toString(), // Convert BigInt to string
+            amount.toString(),
           ]),
           value: '0',
         };
@@ -165,6 +185,10 @@ export class PaymentService {
 
     return {
       ...transactionData,
+      token: paymentRequest.token,
+      amount: paymentRequest.amount,
+      description: paymentRequest.description,
+      fromAddress: ensName || paymentRequest.fromAddress,
       requestId,
     };
   }

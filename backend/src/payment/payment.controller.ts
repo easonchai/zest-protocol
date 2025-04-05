@@ -108,6 +108,10 @@ export class PaymentController {
         to: { type: 'string', description: 'Recipient address' },
         value: { type: 'string', description: 'Amount in wei' },
         data: { type: 'string', description: 'Transaction data' },
+        token: { type: 'string', description: 'Token symbol' },
+        amount: { type: 'string', description: 'Amount' },
+        description: { type: 'string', description: 'Description' },
+        fromAddress: { type: 'string', description: 'Sender address' },
         requestId: { type: 'string', description: 'Payment request ID' },
       },
     },
@@ -125,10 +129,7 @@ export class PaymentController {
     },
   })
   async preparePayment(@Body(ValidationPipe) payment: PreparePaymentDto) {
-    return await this.paymentService.preparePayment(
-      payment.requestId,
-      payment.fromAddress,
-    );
+    return await this.paymentService.preparePayment(payment.requestId);
   }
 
   @Post('record')

@@ -41,10 +41,6 @@ export class PreparePaymentDto {
   @IsString()
   @IsNotEmpty()
   requestId: string;
-
-  @IsString()
-  @IsNotEmpty()
-  fromAddress: string;
 }
 
 export class RecordPaymentDto {
