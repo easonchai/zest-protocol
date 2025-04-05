@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { X, QrCode } from "lucide-react";
-import { getBalance, getEnsAddress } from "@/utils/api";
+import { getBalance, getEnsAddress, preparePayment } from "@/utils/api";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { ethers } from "ethers";
 import { toast } from "sonner";
@@ -263,6 +263,8 @@ export function SendForm() {
   const handleScan = async (result: string | null) => {
     if (!result) return;
 
+    const paymentData = await preparePayment(result);
+
     try {
       // Clear existing recipients
       setRecipients([]);
@@ -271,9 +273,11 @@ export function SendForm() {
       setRecipients([
         {
           id: Date.now().toString(),
-          name: result,
+          name: paymentData.fromAddress,
         },
       ]);
+
+      setSendAmount(paymentData.amount);
 
       // Stop scanning
       setIsScanning(false);
@@ -363,7 +367,6 @@ export function SendForm() {
             <div className="relative aspect-square">
               <Scanner
                 onScan={(result) => {
-                  console.log(JSON.parse(result[0].rawValue));
                   handleScan(JSON.parse(result[0].rawValue).requestId);
                 }}
                 onError={(error: unknown) => {
