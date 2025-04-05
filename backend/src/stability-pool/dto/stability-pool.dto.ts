@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsString, IsNumber, Min } from 'class-validator';
 
 export class CreateStabilityDepositDto {
@@ -14,6 +15,7 @@ export class CreateStabilityDepositDto {
     example: 50000,
   })
   @IsNumber()
+  @Type(() => Number)
   @Min(0)
   amount: number;
 }

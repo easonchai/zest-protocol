@@ -1,2 +1,12 @@
 L2Registry: [0x4f339a1f489d42f4e5da00398e6ecea38c2f687e](https://sepolia.basescan.org/address/0x4f339a1f489d42f4e5da00398e6ecea38c2f687e#writeContract)
 L2Registrar: [0x4B0c4367AbE91C577Fe99e3EDafC553132718363](https://sepolia.basescan.org/address/0x4B0c4367AbE91C577Fe99e3EDafC553132718363#writeContract)
+
+Deployment Summary:
+
+---
+
+Mock USDT: 0x699866bC183A15388a836a6eAFfC93a58e38cc6b
+ZEST Token: 0x911f041019Afc421c13c79565bDDACB72d821D90
+CDP Manager: 0xadF6b9BcED038D5c592833ea73d58595ED12beA8
+Stability Pool: 0x0CBa737572890456ceCa5e6aA99581D92dB913E2
+Swap Module: 0x85b939F4A2a3caE18C9E8b52F58cd13A14D922b4

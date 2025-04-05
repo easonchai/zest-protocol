@@ -2,14 +2,50 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { SZestTokenIcon } from "./szest-token-icon";
-import { calculateSZESTAmount, getBalance } from "@/utils/api";
+import {
+  calculateSZESTAmount,
+  getBalance,
+  prepareStake,
+  recordStake,
+} from "@/utils/api";
+import { ethers } from "ethers";
+import { toast } from "sonner";
 
 export function StakingForm() {
   const { address } = useAccount();
+  const { writeContract, isPending } = useWriteContract({
+    mutation: {
+      onSuccess: async (hash) => {
+        try {
+          await recordStake(
+            {
+              depositor: address!,
+              amount: stakeAmount,
+            },
+            hash
+          );
+          toast.success("Successfully staked ZEST!");
+          // Refresh balances
+          const newBalances = await getBalance(address!);
+          setBalance(newBalances.zest);
+        } catch (error) {
+          console.error("Error recording stake:", error);
+          toast.error("Failed to record stake");
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      onError: (error) => {
+        console.error("Error staking:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to stake");
+        setIsLoading(false);
+      },
+    },
+  });
   const [balance, setBalance] = useState<string>("0.00");
   const [stakeAmount, setStakeAmount] = useState("0.00");
   const [debouncedStakeAmount] = useDebounce(stakeAmount, 500);
@@ -58,7 +94,7 @@ export function StakingForm() {
   }, [debouncedStakeAmount, address]);
 
   const handleMaxClick = () => {
-    setStakeAmount(Number(balance).toFixed(2));
+    setStakeAmount(Number(ethers.formatEther(balance)).toFixed(2));
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,11 +115,61 @@ export function StakingForm() {
   }, [stakeAmount, APY]);
 
   const formattedBalance = useMemo(() => {
-    return Number(balance).toLocaleString(undefined, {
+    // Convert from 18 decimals to ether and format to 2 decimal places
+    if (balance === "0.00") return "0.00";
+    return Number(ethers.formatEther(balance)).toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   }, [balance]);
+
+  const handleStake = async () => {
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Validate stake amount
+      const amount = parseFloat(stakeAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error("Please enter a valid amount to stake");
+      }
+
+      // Prepare stake transaction
+      const stakeData = await prepareStake({
+        depositor: address,
+        amount: stakeAmount,
+      });
+
+      // Validate stake data
+      if (!stakeData.to || !stakeData.data) {
+        throw new Error("Invalid stake data received from server");
+      }
+
+      // Send transaction
+      writeContract({
+        address: stakeData.to as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "amount", type: "uint256" }],
+            name: "stake",
+            outputs: [],
+            stateMutability: "nonpayable",
+            type: "function",
+          },
+        ],
+        functionName: "stake",
+        args: [ethers.parseEther(stakeAmount)],
+      });
+    } catch (error) {
+      console.error("Error staking:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to stake");
+      setIsLoading(false);
+    }
+  };
 
   if (!address) {
     return (
@@ -167,8 +253,12 @@ export function StakingForm() {
           </div>
 
           {/* Continue Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm cursor-pointer">
-            Continue
+          <Button
+            className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm cursor-pointer"
+            onClick={handleStake}
+            disabled={isLoading || isPending}
+          >
+            {isLoading || isPending ? "Processing..." : "Continue"}
           </Button>
         </div>
       </div>

@@ -194,3 +194,50 @@ export async function checkCDPExists(address: string): Promise<boolean> {
     return false;
   }
 }
+
+export async function prepareStake(createStakeDto: {
+  depositor: string;
+  amount: string;
+}) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/stability-pool/prepare`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(createStakeDto),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to prepare stake");
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Error preparing stake:", error);
+    throw error;
+  }
+}
+
+export async function recordStake(
+  createStakeDto: { depositor: string; amount: string },
+  txHash: string
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/stability-pool/record?txHash=${txHash}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createStakeDto),
+      }
+    );
+    if (!response.ok) {
+      throw new Error("Failed to record stake");
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Error recording stake:", error);
+    throw error;
+  }
+}
