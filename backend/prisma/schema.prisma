@@ -5,7 +5,8 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin", "linux-arm64-openssl-1.1.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -83,4 +84,36 @@ model Transaction {
 
   @@index([from, to])
   @@index([txHash])
+}
+
+model PaymentRequest {
+  id          String   @id @default(uuid())
+  amount      String
+  token       String
+  description String?
+  fromAddress String?
+  status      String   @default("PENDING")
+  txHash      String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([fromAddress])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model KYCVerification {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  address     String?
+  name        String?
+  nationality String?
+  dateOfBirth String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([address])
+  @@index([status])
 }
