@@ -17,7 +17,7 @@ export class CDPService {
 
     // Prepare transaction data
     const iface = new ethers.Interface(this.blockchain.cdpManagerABI);
-    const data = iface.encodeFunctionData('createCDP', [
+    const data = iface.encodeFunctionData('openCDP', [
       collateral,
       debt,
       createCDPDto.interestRate,
@@ -26,7 +26,7 @@ export class CDPService {
     return {
       to: this.blockchain.cdpManagerContract,
       data,
-      value: '0', // No ETH value needed
+      value: collateral.toString(),
     };
   }
 
