@@ -67,6 +67,34 @@ export async function getEnsName(address: string): Promise<string | null> {
   }
 }
 
+export async function getEnsAddress(name: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/ens/resolve/${name.toLowerCase()}`
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      return null;
+    }
+
+    try {
+      const data = JSON.parse(text);
+      return data.name || null;
+    } catch (parseError) {
+      // If the response is not JSON, return the text directly
+      return text || null;
+    }
+  } catch (error) {
+    console.error("Error fetching ENS name:", error);
+    return null;
+  }
+}
+
 interface PaymentRequestResponse {
   requestId: string;
   qrData: string;
@@ -125,6 +153,34 @@ export async function preparePayment(requestId: string): Promise<PaymentData> {
   }
 
   return response.json();
+}
+
+export async function recordPayment(
+  createPaymentDto: { from: string; to: string; amount: string },
+  txHash: string
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/payment/record?txHash=${txHash}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createPaymentDto),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to record payment");
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error recording payment:", error);
+    throw error;
+  }
 }
 
 export interface CDPData {

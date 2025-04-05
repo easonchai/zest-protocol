@@ -1,12 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { useAccount } from "wagmi";
+import {
+  useState,
+  useRef,
+  useEffect,
+  type KeyboardEvent,
+  useMemo,
+} from "react";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { X, QrCode } from "lucide-react";
-import { getBalance, preparePayment } from "@/utils/api";
+import { getBalance, getEnsAddress } from "@/utils/api";
 import { Scanner } from "@yudiel/react-qr-scanner";
+import { ethers } from "ethers";
+import { toast } from "sonner";
 
 interface Recipient {
   id: string;
@@ -22,7 +34,104 @@ export function SendForm() {
   const [balance, setBalance] = useState("0.00");
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>(
+    undefined
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: approvalReceipt, isSuccess: isApprovalSuccess } =
+    useWaitForTransactionReceipt({
+      hash: approvalHash,
+    });
+
+  useEffect(() => {
+    if (isApprovalSuccess && approvalReceipt && recipients.length > 0) {
+      const sendPayment = async () => {
+        try {
+          setIsSending(true);
+          // Resolve ENS address if needed
+          const recipientAddress = await getEnsAddress(recipients[0].name);
+          if (!recipientAddress) {
+            throw new Error("Invalid recipient address");
+          }
+
+          writeTransfer({
+            address: process.env.NEXT_PUBLIC_ZEST_ADDRESS as `0x${string}`,
+            abi: [
+              {
+                type: "function",
+                name: "transfer",
+                inputs: [
+                  { name: "to", type: "address", internalType: "address" },
+                  { name: "amount", type: "uint256", internalType: "uint256" },
+                ],
+                outputs: [{ name: "", type: "bool", internalType: "bool" }],
+                stateMutability: "nonpayable",
+              },
+            ],
+            functionName: "transfer",
+            args: [
+              recipientAddress as `0x${string}`,
+              ethers.parseEther(sendAmount),
+            ],
+          });
+        } catch (error) {
+          console.error("Error resolving recipient address:", error);
+          toast.error("Failed to resolve recipient address");
+          setIsSending(false);
+          setApprovalHash(undefined);
+        }
+      };
+
+      sendPayment();
+    }
+  }, [isApprovalSuccess, approvalReceipt, recipients, sendAmount]);
+
+  const { writeContract: writeApprove, isPending: isApprovingPending } =
+    useWriteContract({
+      mutation: {
+        onSuccess: (hash) => {
+          toast.success("Approval transaction sent!");
+          setApprovalHash(hash);
+        },
+        onError: (error) => {
+          console.error("Error approving:", error);
+          toast.error(
+            error instanceof Error ? error.message : "Failed to approve"
+          );
+          setIsApproving(false);
+        },
+      },
+    });
+
+  const { writeContract: writeTransfer, isPending: isSendingPending } =
+    useWriteContract({
+      mutation: {
+        onSuccess: async () => {
+          try {
+            toast.success("Payment sent successfully!");
+            // Refresh balance
+            const newBalances = await getBalance(address!);
+            setBalance(newBalances.zest);
+          } catch (error) {
+            console.error("Error updating balance:", error);
+          } finally {
+            setIsSending(false);
+            setApprovalHash(undefined);
+          }
+        },
+        onError: (error) => {
+          console.error("Error sending payment:", error);
+          toast.error(
+            error instanceof Error ? error.message : "Failed to send payment"
+          );
+          setIsSending(false);
+          setApprovalHash(undefined);
+        },
+      },
+    });
 
   // Fetch balance
   useEffect(() => {
@@ -128,21 +237,16 @@ export function SendForm() {
     if (!result) return;
 
     try {
-      const paymentData = await preparePayment(result);
-
       // Clear existing recipients
       setRecipients([]);
 
-      // Add the payment requester as recipient
+      // Add the scanned address as recipient
       setRecipients([
         {
           id: Date.now().toString(),
-          name: paymentData.fromAddress,
+          name: result,
         },
       ]);
-
-      // Set the amount
-      setSendAmount(paymentData.amount);
 
       // Stop scanning
       setIsScanning(false);
@@ -157,6 +261,70 @@ export function SendForm() {
     setScanError("Failed to scan QR code. Please try again.");
     console.error("QR scan error:", error);
   };
+
+  const handleSend = async () => {
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (recipients.length === 0) {
+      toast.error("Please add a recipient");
+      return;
+    }
+
+    try {
+      setIsApproving(true);
+
+      // Validate send amount
+      const amount = parseFloat(sendAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error("Please enter a valid amount to send");
+      }
+
+      // Resolve ENS address if needed
+      const recipientAddress = await getEnsAddress(recipients[0].name);
+      if (!recipientAddress) {
+        throw new Error("Invalid recipient address");
+      }
+
+      // Request approval first
+      writeApprove({
+        address: process.env.NEXT_PUBLIC_ZEST_ADDRESS as `0x${string}`,
+        abi: [
+          {
+            type: "function",
+            name: "approve",
+            inputs: [
+              { name: "spender", type: "address", internalType: "address" },
+              { name: "amount", type: "uint256", internalType: "uint256" },
+            ],
+            outputs: [{ name: "", type: "bool", internalType: "bool" }],
+            stateMutability: "nonpayable",
+          },
+        ],
+        functionName: "approve",
+        args: [
+          recipientAddress as `0x${string}`,
+          ethers.parseEther(sendAmount),
+        ],
+      });
+    } catch (error) {
+      console.error("Error preparing payment:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare payment"
+      );
+      setIsApproving(false);
+    }
+  };
+
+  const formattedBalance = useMemo(() => {
+    if (balance === "0.00") return "0.00";
+    return Number(ethers.formatEther(balance)).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }, [balance]);
 
   if (isScanning) {
     return (
@@ -271,7 +439,7 @@ export function SendForm() {
                     <ZestTokenIcon />
                   </div>
                   <div className="text-[#A5A5A5] text-sm font-semibold">
-                    Bal: {balance}
+                    Bal: {formattedBalance}
                   </div>
                 </div>
               </div>
@@ -285,8 +453,18 @@ export function SendForm() {
           </div>
 
           {/* Confirm Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm cursor-pointer">
-            Confirm payment
+          <Button
+            className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm cursor-pointer"
+            onClick={handleSend}
+            disabled={
+              isApproving || isApprovingPending || isSending || isSendingPending
+            }
+          >
+            {isApproving || isApprovingPending
+              ? "Approving..."
+              : isSending || isSendingPending
+              ? "Sending..."
+              : "Confirm payment"}
           </Button>
         </div>
       </div>
