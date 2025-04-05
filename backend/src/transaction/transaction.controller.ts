@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, ValidationPipe } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,6 +7,11 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { TransactionService } from './transaction.service';
+import {
+  TransactionPaginationDto,
+  GetTransactionsByAddressDto,
+  GetTransactionsByTypeDto,
+} from './dto/transaction.dto';
 
 @ApiTags('Transactions')
 @Controller('transactions')
@@ -24,8 +29,10 @@ export class TransactionController {
     description: 'The Ethereum address to get transactions for',
     example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
   })
-  async getTransactionsByAddress(@Param('address') address: string) {
-    return await this.transactionService.findByAddress(address);
+  async getTransactionsByAddress(
+    @Param(ValidationPipe) params: GetTransactionsByAddressDto,
+  ) {
+    return await this.transactionService.findByAddress(params.address);
   }
 
   @Get('type/:type')
@@ -40,8 +47,10 @@ export class TransactionController {
     example: 'SWAP',
     enum: ['SWAP', 'STAKE', 'CDP', 'STABILITY_DEPOSIT', 'ENS_REGISTER'],
   })
-  async getTransactionsByType(@Param('type') type: string) {
-    return await this.transactionService.findByType(type);
+  async getTransactionsByType(
+    @Param(ValidationPipe) params: GetTransactionsByTypeDto,
+  ) {
+    return await this.transactionService.findByType(params.type);
   }
 
   @Get()
@@ -59,11 +68,23 @@ export class TransactionController {
     required: false,
     example: 10,
   })
+  @ApiQuery({
+    name: 'address',
+    description: 'Filter by address',
+    required: false,
+    example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+  })
+  @ApiQuery({
+    name: 'type',
+    description: 'Filter by transaction type',
+    required: false,
+    example: 'SWAP',
+    enum: ['SWAP', 'STAKE', 'CDP', 'STABILITY_DEPOSIT', 'ENS_REGISTER'],
+  })
   async getAllTransactions(
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
+    @Query(ValidationPipe) query: TransactionPaginationDto,
   ) {
-    return await this.transactionService.findAll(page, limit);
+    return await this.transactionService.findAll(query);
   }
 
   @Get('stats')

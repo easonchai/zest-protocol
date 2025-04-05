@@ -1,65 +1,74 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionPaginationDto } from './dto/transaction.dto';
 
 @Injectable()
 export class TransactionService {
   constructor(private prisma: PrismaService) {}
 
-  findByAddress(address: string) {
+  async findByAddress(address: string) {
     return this.prisma.transaction.findMany({
       where: {
         OR: [{ from: address }, { to: address }],
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  findByType(type: string) {
+  async findByType(type: string) {
     return this.prisma.transaction.findMany({
       where: { type },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findAll(page: number, limit: number) {
+  async findAll(query: TransactionPaginationDto) {
+    const { page = 1, limit = 10, address, type } = query;
     const skip = (page - 1) * limit;
+
+    const where = {
+      ...(address && {
+        OR: [{ from: address }, { to: address }],
+      }),
+      ...(type && { type }),
+    };
+
     const [transactions, total] = await Promise.all([
       this.prisma.transaction.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.transaction.count(),
+      this.prisma.transaction.count({ where }),
     ]);
 
     return {
       transactions,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
   async getStats() {
-    const [totalTransactions, uniqueUsers] = await Promise.all([
+    const [total, byType] = await Promise.all([
       this.prisma.transaction.count(),
-      this.prisma.transaction.findMany({
-        select: {
-          from: true,
-        },
-        distinct: ['from'],
+      this.prisma.transaction.groupBy({
+        by: ['type'],
+        _count: true,
       }),
     ]);
 
     return {
-      totalTransactions,
-      uniqueUsers: uniqueUsers.length,
-      updatedAt: new Date(),
+      total,
+      byType: byType.reduce((acc, curr) => {
+        acc[curr.type] = curr._count;
+        return acc;
+      }, {}),
     };
   }
 }
