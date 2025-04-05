@@ -2,18 +2,22 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "wagmi";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { BitcoinIcon } from "./btc-token-icon";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { getBalance, getBtcPrice } from "@/utils/api";
 import { ethers } from "ethers";
+import InterestSlider from "./interest-slider";
 
 export function BorrowForm() {
   const { address } = useAccount();
   const [collateralAmount, setCollateralAmount] = useState("0.02");
   const [mintAmount, setMintAmount] = useState("0");
   const [interestRate, setInterestRate] = useState(5.3);
+  const [riskLevel, setRiskLevel] = useState<"high" | "medium" | "low">(
+    "medium"
+  );
+  const [yearlyAmount, setYearlyAmount] = useState("0");
   const [selectedMintOption, setSelectedMintOption] = useState("safe");
   const [btcBalance, setBtcBalance] = useState("0.00");
   const [zestBalance, setZestBalance] = useState("0.00");
@@ -111,6 +115,26 @@ export function BorrowForm() {
     }
   }, [collateralAmount, btcPrice, selectedMintOption]);
 
+  // Calculate risk level based on interest rate
+  useEffect(() => {
+    if (interestRate <= 30) {
+      setRiskLevel("high");
+    } else if (interestRate <= 60) {
+      setRiskLevel("medium");
+    } else {
+      setRiskLevel("low");
+    }
+  }, [interestRate]);
+
+  // Calculate yearly amount based on interest rate and mint amount
+  useEffect(() => {
+    if (mintAmount && interestRate) {
+      const mintValue = parseFloat(mintAmount.replace(/,/g, ""));
+      const yearlyValue = (mintValue * interestRate) / 100;
+      setYearlyAmount(yearlyValue.toFixed(2));
+    }
+  }, [mintAmount, interestRate]);
+
   const handleMaxClick = () => {
     setCollateralAmount(btcBalance);
   };
@@ -123,8 +147,8 @@ export function BorrowForm() {
     setCollateralAmount(value);
   };
 
-  const handleInterestRateChange = (value: number[]) => {
-    setInterestRate(value[0]);
+  const handleInterestRateChange = (value: number) => {
+    setInterestRate(value);
   };
 
   return (
@@ -252,7 +276,15 @@ export function BorrowForm() {
           {/* Liquidation Risk */}
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <div className="w-2 h-2 rounded-full bg-[#6AE084] mr-1"></div>
+              <div
+                className={`w-2 h-2 rounded-full mr-1 ${
+                  selectedMintOption === "safe"
+                    ? "bg-[#6AE084]"
+                    : selectedMintOption === "medium"
+                    ? "bg-[#F8B312]"
+                    : "bg-[#F3533E]"
+                }`}
+              ></div>
               <span className="text-[#4A4A4A] text-xs font-medium">
                 {selectedMintOption === "safe"
                   ? "Low"
@@ -261,7 +293,16 @@ export function BorrowForm() {
                   : "High"}{" "}
                 liquidation risk
               </span>
-              <span className="ml-2 text-[#168738] bg-[#DCF6E4] text-xs px-1 py-0.5 rounded-[1px]">
+              <span
+                className={`ml-2  text-xs px-1 py-0.5 rounded-[1px]
+                ${
+                  selectedMintOption === "safe"
+                    ? "text-[#168738] bg-[#DCF6E4]"
+                    : selectedMintOption === "medium"
+                    ? "text-[#B36A02] bg-[#f6f2dc]"
+                    : "text-[#B3401E] bg-[#f6dcdc]"
+                }`}
+              >
                 {collateralRatio}%
               </span>
             </div>
@@ -279,52 +320,37 @@ export function BorrowForm() {
           <div className="bg-[#FBFBFB] rounded-sm p-5">
             <div className="text-[#827A77] mb-1 text-sm">Set interest rate</div>
             <div className="flex items-baseline">
-              <span className="text-[2.75rem] leading-tight font-bold text-[#2A2A2A]">
-                {interestRate}
+              <span className="text-xl leading-tight font-semibold text-[#2A2A2A]">
+                {interestRate.toFixed(1)}
               </span>
-              <span className="text-xl text-[#4A4A4A] ml-1">% per year</span>
-              <span className="text-[#827A77] text-sm ml-2">
-                (200 ZEST / year)
+              <span className="text-sm text-[#6C6866] ml-1">% per year</span>
+              <span className="text-[#A5A5A5] text-xs ml-1">
+                ({yearlyAmount} ZEST / year)
               </span>
             </div>
 
             {/* Interest Rate Slider */}
             <div className="mt-4 relative">
-              <div className="h-2 bg-[#EBE7E7] rounded-full relative">
-                <div
-                  className="absolute top-0 left-0 h-2 bg-gradient-to-r from-[#CB4118] to-[#F8B312] rounded-full"
-                  style={{ width: "60%" }}
-                ></div>
-                <div className="absolute top-0 left-0 w-full">
-                  {/* Histogram bars */}
-                  <div className="relative h-2">
-                    <div className="absolute bottom-0 left-[20%] w-1 h-1 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[25%] w-1 h-2 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[30%] w-1 h-1.5 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[35%] w-1 h-3 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[40%] w-1 h-2 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[45%] w-1 h-4 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[50%] w-1 h-3 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[55%] w-1 h-2 bg-[#F8B312]"></div>
-                    <div className="absolute bottom-0 left-[60%] w-1 h-1 bg-[#F8B312]"></div>
-                  </div>
-                </div>
-                <div className="absolute top-[-4px] left-[60%] w-4 h-4 bg-white border-2 border-[#D9D9D9] rounded-full transform -translate-x-1/2"></div>
-              </div>
-              <Slider
-                defaultValue={[5.3]}
-                max={10}
-                step={0.1}
-                className="opacity-0 absolute top-0 left-0 w-full"
+              <InterestSlider
+                value={interestRate}
                 onValueChange={handleInterestRateChange}
               />
             </div>
 
             {/* Risk Indicator */}
             <div className="flex items-center mt-4">
-              <div className="w-2 h-2 rounded-full bg-[#F8B312] mr-1"></div>
+              <div
+                className={`w-2 h-2 rounded-full mr-1 ${
+                  riskLevel === "high"
+                    ? "bg-[#F3533E]"
+                    : riskLevel === "medium"
+                    ? "bg-[#F8B312]"
+                    : "bg-[#6AE084]"
+                }`}
+              ></div>
               <span className="text-[#4A4A4A] font-medium text-xs">
-                Medium redemption risk
+                {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)}{" "}
+                redemption risk
               </span>
             </div>
           </div>
