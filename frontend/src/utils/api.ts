@@ -102,3 +102,30 @@ export async function createPaymentRequest(
 
   return response.json();
 }
+
+export interface PaymentData {
+  to: string;
+  value: string;
+  data: string;
+  token: string;
+  amount: string;
+  description: string | null;
+  fromAddress: string;
+  requestId: string;
+}
+
+export async function preparePayment(requestId: string): Promise<PaymentData> {
+  const response = await fetch(`${API_BASE_URL}/payment/prepare`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ requestId }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to prepare payment");
+  }
+
+  return response.json();
+}

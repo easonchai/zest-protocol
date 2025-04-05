@@ -5,7 +5,8 @@ import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { X, QrCode } from "lucide-react";
-import { getBalance } from "@/utils/api";
+import { getBalance, preparePayment } from "@/utils/api";
+import { Scanner } from "@yudiel/react-qr-scanner";
 
 interface Recipient {
   id: string;
@@ -19,6 +20,8 @@ export function SendForm() {
   const [suggestedValue, setSuggestedValue] = useState("");
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [balance, setBalance] = useState("0.00");
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch balance
@@ -121,6 +124,78 @@ export function SendForm() {
     setRecipients(recipients.filter((recipient) => recipient.id !== id));
   };
 
+  const handleScan = async (result: string | null) => {
+    if (!result) return;
+
+    try {
+      const paymentData = await preparePayment(result);
+
+      // Clear existing recipients
+      setRecipients([]);
+
+      // Add the payment requester as recipient
+      setRecipients([
+        {
+          id: Date.now().toString(),
+          name: paymentData.fromAddress,
+        },
+      ]);
+
+      // Set the amount
+      setSendAmount(paymentData.amount);
+
+      // Stop scanning
+      setIsScanning(false);
+      setScanError(null);
+    } catch (error) {
+      setScanError("Failed to process QR code. Please try again.");
+      console.error("Error processing QR code:", error);
+    }
+  };
+
+  const handleScanError = (error: Error) => {
+    setScanError("Failed to scan QR code. Please try again.");
+    console.error("QR scan error:", error);
+  };
+
+  if (isScanning) {
+    return (
+      <div className="max-w-md mx-auto px-4">
+        <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 space-y-6">
+            <div className="text-center text-[#827A77] mb-4">Scan QR Code</div>
+
+            <div className="relative aspect-square">
+              <Scanner
+                onScan={(result) => {
+                  console.log(JSON.parse(result[0].rawValue));
+                  handleScan(JSON.parse(result[0].rawValue).requestId);
+                }}
+                onError={(error: unknown) => {
+                  handleScanError(
+                    error instanceof Error ? error : new Error(String(error))
+                  );
+                }}
+                constraints={{ facingMode: "environment" }}
+              />
+            </div>
+
+            {scanError && (
+              <div className="text-red-500 text-center">{scanError}</div>
+            )}
+
+            <Button
+              onClick={() => setIsScanning(false)}
+              className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto px-4">
       <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -130,7 +205,10 @@ export function SendForm() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <div className="text-[#827A77] text-lg">Send to</div>
-              <button className="text-[#CB4118] flex items-center text-sm font-medium cursor-pointer">
+              <button
+                onClick={() => setIsScanning(true)}
+                className="text-[#CB4118] flex items-center text-sm font-medium cursor-pointer"
+              >
                 <QrCode className="w-4 h-4 mr-1" />
                 Scan QR
               </button>
@@ -207,7 +285,7 @@ export function SendForm() {
           </div>
 
           {/* Confirm Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm">
+          <Button className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm cursor-pointer">
             Confirm payment
           </Button>
         </div>
