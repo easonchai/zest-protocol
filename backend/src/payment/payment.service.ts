@@ -42,14 +42,24 @@ export class PaymentService {
     @InjectQueue('payment') private paymentQueue: Queue,
   ) {}
 
-  async getBalance(identifier: string): Promise<BalanceResponse> {
-    // Resolve ENS name if provided
-    const address =
-      (await this.ensService.resolveName(identifier)) || identifier;
-
-    if (!ethers.isAddress(address)) {
-      throw new Error('Invalid address or ENS name');
+  private async resolveAddress(identifier: string): Promise<string> {
+    try {
+      const resolvedAddress = await this.ensService.resolveName(identifier);
+      if (resolvedAddress) {
+        return resolvedAddress;
+      }
+      if (!ethers.isAddress(identifier)) {
+        throw new Error('Invalid address or ENS name');
+      }
+      return ethers.getAddress(identifier);
+    } catch (error) {
+      this.logger.error(`Failed to resolve address: ${error.message}`);
+      throw new Error('Failed to resolve address or ENS name');
     }
+  }
+
+  async getBalance(identifier: string): Promise<BalanceResponse> {
+    const address = await this.resolveAddress(identifier);
 
     // Get balances from blockchain
     const [cbtcBalance, zestBalance, usdtBalance] = await Promise.all([
@@ -114,16 +124,16 @@ export class PaymentService {
       throw new Error('Payment request has expired');
     }
 
+    const resolvedFromAddress = await this.resolveAddress(fromAddress);
     const amount = ethers.parseEther(paymentRequest.amount);
 
     // Prepare transaction based on token type
     let transactionData;
     switch (paymentRequest.token) {
       case 'cBTC':
-        // For native cBTC, we just need to send the amount
         transactionData = {
-          to: fromAddress,
-          value: amount,
+          to: resolvedFromAddress,
+          value: amount.toString(), // Convert BigInt to string
           data: '0x',
         };
         break;
@@ -131,8 +141,8 @@ export class PaymentService {
         transactionData = {
           to: this.configService.get<string>('ZEST_CONTRACT'),
           data: this.erc20Iface.encodeFunctionData('transfer', [
-            fromAddress,
-            amount,
+            resolvedFromAddress,
+            amount.toString(), // Convert BigInt to string
           ]),
           value: '0',
         };
@@ -141,8 +151,8 @@ export class PaymentService {
         transactionData = {
           to: this.configService.get<string>('USDT_CONTRACT'),
           data: this.erc20Iface.encodeFunctionData('transfer', [
-            fromAddress,
-            amount,
+            resolvedFromAddress,
+            amount.toString(), // Convert BigInt to string
           ]),
           value: '0',
         };
