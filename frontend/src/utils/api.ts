@@ -11,10 +11,7 @@ export async function calculateSZESTAmount(amount: string): Promise<string> {
     throw new Error("Failed to calculate sZEST amount");
   }
   const rawAmount = await response.text();
-  // Remove any decimal points and convert to BigInt string
-  const bigIntAmount = rawAmount.split(".")[0];
-  // Format from 18 decimals to 2 decimal places
-  return Number(ethers.formatEther(bigIntAmount)).toFixed(2);
+  return Number(rawAmount).toFixed(2);
 }
 
 export async function getBtcPrice(): Promise<string> {

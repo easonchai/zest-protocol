@@ -2,7 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { useAccount, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { SZestTokenIcon } from "./szest-token-icon";
@@ -17,40 +21,101 @@ import { toast } from "sonner";
 
 export function StakingForm() {
   const { address } = useAccount();
-  const { writeContract, isPending } = useWriteContract({
-    mutation: {
-      onSuccess: async (hash) => {
-        try {
-          await recordStake(
-            {
-              depositor: address!,
-              amount: stakeAmount,
-            },
-            hash
+  const [isApproving, setIsApproving] = useState(false);
+  const [isStaking, setIsStaking] = useState(false);
+  const [stakeData, setStakeData] = useState<{
+    to: string;
+    data: string;
+  } | null>(null);
+  const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>(
+    undefined
+  );
+
+  const { data: approvalReceipt, isSuccess: isApprovalSuccess } =
+    useWaitForTransactionReceipt({
+      hash: approvalHash,
+    });
+
+  useEffect(() => {
+    if (isApprovalSuccess && approvalReceipt && stakeData) {
+      setIsStaking(true);
+      writeStake({
+        address: stakeData.to as `0x${string}`,
+        abi: [
+          {
+            type: "function",
+            name: "deposit",
+            inputs: [
+              { name: "assets", type: "uint256", internalType: "uint256" },
+              { name: "receiver", type: "address", internalType: "address" },
+            ],
+            outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+            stateMutability: "nonpayable",
+          },
+        ],
+        functionName: "deposit",
+        args: [ethers.parseEther(stakeAmount), address!],
+      });
+    }
+  }, [isApprovalSuccess, approvalReceipt, stakeData]);
+
+  const { writeContract: writeApprove, isPending: isApprovingPending } =
+    useWriteContract({
+      mutation: {
+        onSuccess: (hash) => {
+          toast.success("Approval transaction sent!");
+          setApprovalHash(hash);
+        },
+        onError: (error) => {
+          console.error("Error approving:", error);
+          toast.error(
+            error instanceof Error ? error.message : "Failed to approve"
           );
-          toast.success("Successfully staked ZEST!");
-          // Refresh balances
-          const newBalances = await getBalance(address!);
-          setBalance(newBalances.zest);
-        } catch (error) {
-          console.error("Error recording stake:", error);
-          toast.error("Failed to record stake");
-        } finally {
-          setIsLoading(false);
-        }
+          setIsApproving(false);
+          setStakeData(null);
+        },
       },
-      onError: (error) => {
-        console.error("Error staking:", error);
-        toast.error(error instanceof Error ? error.message : "Failed to stake");
-        setIsLoading(false);
+    });
+
+  const { writeContract: writeStake, isPending: isStakingPending } =
+    useWriteContract({
+      mutation: {
+        onSuccess: async (hash) => {
+          try {
+            await recordStake(
+              {
+                depositor: address!,
+                amount: stakeAmount,
+              },
+              hash
+            );
+            toast.success("Successfully staked ZEST!");
+            // Refresh balances
+            const newBalances = await getBalance(address!);
+            setBalance(newBalances.zest);
+          } catch (error) {
+            console.error("Error recording stake:", error);
+            toast.error("Failed to record stake");
+          } finally {
+            setIsStaking(false);
+            setStakeData(null);
+          }
+        },
+        onError: (error) => {
+          console.error("Error staking:", error);
+          toast.error(
+            error instanceof Error ? error.message : "Failed to stake"
+          );
+          setIsStaking(false);
+          setStakeData(null);
+        },
       },
-    },
-  });
+    });
+
   const [balance, setBalance] = useState<string>("0.00");
   const [stakeAmount, setStakeAmount] = useState("0.00");
   const [debouncedStakeAmount] = useDebounce(stakeAmount, 500);
   const [szestAmount, setSzestAmount] = useState("0.00");
-  const [isLoading, setIsLoading] = useState(false);
   const APY = 12.5; // 12.5% APY
 
   useEffect(() => {
@@ -78,7 +143,7 @@ export function StakingForm() {
         setSzestAmount("0.00");
         return;
       }
-      setIsLoading(true);
+      setIsStaking(true);
       try {
         const amount = await calculateSZESTAmount(debouncedStakeAmount);
         setSzestAmount(amount);
@@ -86,7 +151,7 @@ export function StakingForm() {
         console.error("Error calculating sZEST amount:", error);
         setSzestAmount("0.00");
       } finally {
-        setIsLoading(false);
+        setIsStaking(false);
       }
     };
 
@@ -130,7 +195,7 @@ export function StakingForm() {
     }
 
     try {
-      setIsLoading(true);
+      setIsApproving(true);
 
       // Validate stake amount
       const amount = parseFloat(stakeAmount);
@@ -138,36 +203,45 @@ export function StakingForm() {
         throw new Error("Please enter a valid amount to stake");
       }
 
-      // Prepare stake transaction
-      const stakeData = await prepareStake({
+      // Prepare stake transaction first to get the correct contract address
+      const preparedData = await prepareStake({
         depositor: address,
         amount: stakeAmount,
       });
 
       // Validate stake data
-      if (!stakeData.to || !stakeData.data) {
+      if (!preparedData.to || !preparedData.data) {
         throw new Error("Invalid stake data received from server");
       }
 
-      // Send transaction
-      writeContract({
-        address: stakeData.to as `0x${string}`,
+      // Store stake data for later use
+      setStakeData(preparedData);
+
+      // Request approval first
+      writeApprove({
+        address: process.env.NEXT_PUBLIC_ZEST_ADDRESS as `0x${string}`,
         abi: [
           {
-            inputs: [{ name: "amount", type: "uint256" }],
-            name: "stake",
-            outputs: [],
+            inputs: [
+              { name: "spender", type: "address" },
+              { name: "amount", type: "uint256" },
+            ],
+            name: "approve",
+            outputs: [{ name: "", type: "bool" }],
             stateMutability: "nonpayable",
             type: "function",
           },
         ],
-        functionName: "stake",
-        args: [ethers.parseEther(stakeAmount)],
+        functionName: "approve",
+        args: [preparedData.to, ethers.parseEther(stakeAmount)],
       });
     } catch (error) {
-      console.error("Error staking:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to stake");
-      setIsLoading(false);
+      console.error("Error preparing stake:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to prepare stake"
+      );
+      setIsApproving(false);
+      setStakeData(null);
     }
   };
 
@@ -242,7 +316,7 @@ export function StakingForm() {
             <div className="flex items-center">
               <SZestTokenIcon size="sm" />
               <span className="text-4xl font-bold ml-2 text-[#2A2A2A]">
-                {isLoading ? "..." : szestAmount}
+                {isStaking ? "..." : szestAmount}
               </span>
             </div>
           </div>
@@ -256,9 +330,15 @@ export function StakingForm() {
           <Button
             className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm cursor-pointer"
             onClick={handleStake}
-            disabled={isLoading || isPending}
+            disabled={
+              isApproving || isApprovingPending || isStaking || isStakingPending
+            }
           >
-            {isLoading || isPending ? "Processing..." : "Continue"}
+            {isApproving || isApprovingPending
+              ? "Approving..."
+              : isStaking || isStakingPending
+              ? "Staking..."
+              : "Continue"}
           </Button>
         </div>
       </div>
