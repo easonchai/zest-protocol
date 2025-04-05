@@ -4,6 +4,7 @@ import { ethers } from 'ethers';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import * as L2RegistrarABI from './abi/L2Registrar.json';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ENSService implements OnModuleInit {
@@ -18,6 +19,7 @@ export class ENSService implements OnModuleInit {
   constructor(
     private configService: ConfigService,
     @InjectQueue('ens') private ensQueue: Queue,
+    private prisma: PrismaService,
   ) {
     // Base sepolia provider for registry/registrar
     this.baseProvider = new ethers.JsonRpcProvider(
@@ -70,14 +72,19 @@ export class ENSService implements OnModuleInit {
 
   async lookupAddress(address: string): Promise<string | null> {
     try {
-      const name = await this.ethProvider.lookupAddress(address);
-      if (!name) return null;
+      const ensRecord = await this.prisma.eNSName.findFirst({
+        where: {
+          owner: {
+            contains: address.toLowerCase(),
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          name: true,
+        },
+      });
 
-      // If the name ends with .zest.eth, return it with just .zest
-      if (name.endsWith(this.FULL_DOMAIN_SUFFIX)) {
-        return name.replace(this.FULL_DOMAIN_SUFFIX, this.DOMAIN_SUFFIX);
-      }
-      return name;
+      return ensRecord?.name || null;
     } catch (error) {
       console.error('Error looking up ENS name:', error);
       return null;
