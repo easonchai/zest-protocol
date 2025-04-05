@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ethers } from 'ethers';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
-import { CreateCDPDto, UpdateCDPDto } from './dto/cdp.dto';
+import { CreateCDPDto } from './dto/cdp.dto';
 
 @Injectable()
 export class CDPService {
@@ -10,29 +11,40 @@ export class CDPService {
     private blockchain: BlockchainService,
   ) {}
 
-  async create(createCDPDto: CreateCDPDto) {
-    // First interact with blockchain
-    const tx = await this.blockchain.createCDP(
-      createCDPDto.collateral,
-      createCDPDto.debt,
-      createCDPDto.interestRate,
-    );
+  prepareCreateCDP(createCDPDto: CreateCDPDto) {
+    const collateral = ethers.parseEther(createCDPDto.collateral.toString());
+    const debt = ethers.parseEther(createCDPDto.debt.toString());
 
-    // Then store in database
-    return this.prisma.cDP.create({
-      data: {
-        owner: createCDPDto.owner,
-        collateral: createCDPDto.collateral,
-        debt: createCDPDto.debt,
-        interestRate: createCDPDto.interestRate,
-      },
-    });
+    // Prepare transaction data
+    const iface = new ethers.Interface(this.blockchain.cdpManagerABI);
+    const data = iface.encodeFunctionData('createCDP', [
+      collateral,
+      debt,
+      createCDPDto.interestRate,
+    ]);
+
+    return {
+      to: this.blockchain.cdpManagerContract,
+      data,
+      value: '0', // No ETH value needed
+    };
   }
 
   async findByOwner(owner: string) {
-    return this.prisma.cDP.findFirst({
+    const cdp = await this.prisma.cDP.findFirst({
       where: { owner },
     });
+
+    if (!cdp) return null;
+
+    // Get on-chain data
+    const onChainCDP = await this.blockchain.getCDPDetails(owner);
+
+    return {
+      ...cdp,
+      onChainCollateral: ethers.formatEther(onChainCDP.collateral),
+      onChainDebt: ethers.formatEther(onChainCDP.debt),
+    };
   }
 
   async findAll(page: number, limit: number) {
@@ -71,5 +83,17 @@ export class CDPService {
       timePassed,
       currentDebt: cdp.debt + interest,
     };
+  }
+
+  recordCDP(createCDPDto: CreateCDPDto, txHash: string) {
+    return this.prisma.cDP.create({
+      data: {
+        owner: createCDPDto.owner,
+        collateral: createCDPDto.collateral,
+        debt: createCDPDto.debt,
+        interestRate: createCDPDto.interestRate,
+        txHash,
+      },
+    });
   }
 }
