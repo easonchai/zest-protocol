@@ -197,10 +197,8 @@ contract CDPManager is ReentrancyGuard, AccessControl {
         totalCollateral -= collateralToLiquidate;
         totalDebt -= debtToRepay;
 
-        // Transfer cBTC to Stability Pool
-        (bool success, ) = address(stabilityPool).call{value: collateralToLiquidate}("");
-        require(success, "cBTC transfer failed");
-        stabilityPool.processLiquidation(owner, debtToRepay, collateralToLiquidate);
+        // Process liquidation and transfer collateral in one call
+        stabilityPool.processLiquidation{value: collateralToLiquidate}(debtToRepay, collateralToLiquidate);
 
         emit CDPLiquidated(owner, debtToRepay, collateralToLiquidate);
     }

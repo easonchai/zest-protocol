@@ -29,7 +29,7 @@ contract ZestTest is Test {
     uint256 public constant INITIAL_CBTC_BALANCE = 100 ether;
     uint256 public constant INITIAL_USDT_BALANCE = 100_000e18;
     uint256 public constant CBTC_PRICE = 85000e18; // $85,000 per cBTC
-    uint256 public constant LIQUIDATION_CBTC_PRICE = 48000e18; // $70,000 per cBTC (below liquidation threshold)
+    uint256 public constant LIQUIDATION_CBTC_PRICE = 40000e18; // $40,000 per cBTC (below liquidation threshold)
 
     function setUp() public {
         // Setup accounts with initial balances
@@ -103,12 +103,12 @@ contract ZestTest is Test {
         // Test 2: Bob provides liquidity to Stability Pool
         vm.startPrank(admin);
         // Mint ZEST to Bob for stability pool deposit
-        zest.mint(bob, 5000e18);
+        zest.mint(bob, 500000e18);
         vm.stopPrank();
 
         vm.startPrank(bob);
         
-        uint256 stabilityDeposit = 5000e18;
+        uint256 stabilityDeposit = 500000e18;
         zest.approve(address(stabilityPool), stabilityDeposit);
         stabilityPool.deposit(stabilityDeposit);
         
@@ -153,11 +153,11 @@ contract ZestTest is Test {
         // Test 5: Price drop and liquidation
         vm.startPrank(admin);
         
-        // Drop cBTC price to $48,000, making Alice's CDP unsafe
+        // Drop cBTC price to $40,000, making Alice's CDP unsafe
         // With 10 cBTC collateral and 450,000 ZEST debt:
-        // Collateral value = 10 * 48000 = 480,000 USD
-        // Collateral ratio = 450,000 / 480,000 = 93%
-        // But liquidation threshold is 91%, so this should trigger liquidation
+        // Collateral value = 10 * 40000 = 400,000 USD
+        // Collateral ratio = 400,000 / 450,000 = 88.89%
+        // Liquidation threshold is 91%, so this should trigger liquidation
         cdpManager.setCBTCPrice(LIQUIDATION_CBTC_PRICE);
         
         vm.stopPrank();
@@ -168,7 +168,7 @@ contract ZestTest is Test {
 
         // Verify liquidation results
         assertEq(address(cdpManager).balance, 0, "CDP Manager should have no cBTC");
-        assertGt(address(stabilityPool).balance, 0, "Stability Pool should have received cBTC");
+        assertGt(bob.balance, INITIAL_CBTC_BALANCE, "Bob should have received cBTC from liquidation");
     }
 
     function testCDPOperations() public {

@@ -95,7 +95,11 @@ contract StabilityPool is ReentrancyGuard, AccessControl {
         require(totalDeposits >= debt, "Insufficient stability pool deposits");
         
         // Calculate bonus collateral (5% more)
-        uint256 totalCollateralWithBonus = collateral * (100 + BONUS_PERCENTAGE) / 100;
+        uint256 totalCollateralWithBonus = collateral;
+        uint256 bonusAmount = (collateral * BONUS_PERCENTAGE) / 100;
+        if (bonusAmount > 0) {
+            totalCollateralWithBonus = collateral + bonusAmount;
+        }
         
         // Distribute collateral to depositors based on their share
         for (uint256 i = 0; i < depositorCount; i++) {
@@ -103,7 +107,7 @@ contract StabilityPool is ReentrancyGuard, AccessControl {
             uint256 userDeposit = deposits[depositor].amount;
             
             if (userDeposit > 0) {
-                uint256 share = (userDeposit * totalCollateralWithBonus) / totalDeposits;
+                uint256 share = (userDeposit * collateral) / totalDeposits;
                 if (share > 0) {
                     (bool success, ) = depositor.call{value: share}("");
                     require(success, "cBTC transfer failed");
