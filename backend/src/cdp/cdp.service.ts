@@ -89,9 +89,9 @@ export class CDPService {
     return this.prisma.cDP.create({
       data: {
         owner: createCDPDto.owner,
-        collateral: createCDPDto.collateral,
-        debt: createCDPDto.debt,
-        interestRate: createCDPDto.interestRate,
+        collateral: Number(createCDPDto.collateral),
+        debt: Number(createCDPDto.debt),
+        interestRate: Number(createCDPDto.interestRate),
         txHash,
       },
     });

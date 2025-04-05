@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+  IsOptional,
+} from 'class-validator';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class CreateCDPDto {
   @ApiProperty({
@@ -7,23 +14,24 @@ export class CreateCDPDto {
     example: '0x1234...',
   })
   @IsString()
+  @IsNotEmpty()
   owner: string;
 
   @ApiProperty({
     description: 'Amount of cBTC to deposit as collateral',
     example: 1.5,
   })
-  @IsNumber()
-  @Min(0)
-  collateral: number;
+  @IsString()
+  @IsNotEmpty()
+  collateral: string;
 
   @ApiProperty({
     description: 'Amount of ZEST to mint',
     example: 50000,
   })
-  @IsNumber()
-  @Min(0)
-  debt: number;
+  @IsString()
+  @IsNotEmpty()
+  debt: string;
 
   @ApiProperty({
     description: 'Interest rate in basis points per second',
@@ -79,4 +87,16 @@ export class CDPResponseDto {
 
   @ApiProperty()
   isLiquidated: boolean;
+}
+
+export class GetCDPDto {
+  @IsString()
+  @IsNotEmpty()
+  owner: string;
+}
+
+export class CDPPaginationDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  owner?: string;
 }

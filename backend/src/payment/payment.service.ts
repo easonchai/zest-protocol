@@ -5,6 +5,7 @@ import { TokenService } from '../token/token.service';
 import { ethers } from 'ethers';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { PaymentPaginationDto } from './dto/payment.dto';
 
 export interface BalanceResponse {
   address: string;
@@ -161,5 +162,40 @@ export class PaymentService {
     });
 
     return paymentRequest;
+  }
+
+  async getPaymentHistory(query: PaymentPaginationDto) {
+    const { page = 1, limit = 10, fromAddress, status } = query;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      ...(fromAddress && { fromAddress }),
+      ...(status && { status }),
+    };
+
+    const [payments, total] = await Promise.all([
+      this.prisma.paymentRequest.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.paymentRequest.count({ where }),
+    ]);
+
+    return {
+      payments,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  private generateQRCode(request: any) {
+    // Implement QR code generation logic
+    return `payment:${request.id}`;
   }
 }
