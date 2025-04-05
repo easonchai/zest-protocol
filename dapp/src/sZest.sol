@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
- * @title Zest Token
- * @notice ERC20 stablecoin with minting/burning rights managed by roles
+ * @title sZest Token
+ * @notice ERC20 token for staked ZEST
  */
-contract Zest is ERC20, ERC20Burnable, Pausable, AccessControl {
+contract sZest is ERC20, ERC20Burnable, Pausable, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
@@ -18,7 +18,7 @@ contract Zest is ERC20, ERC20Burnable, Pausable, AccessControl {
      * @notice Constructor sets up roles and token details
      * @param admin Address that will have admin rights
      */
-    constructor(address admin) ERC20("Zest Stablecoin", "ZEST") {
+    constructor(address admin) ERC20("Staked Zest", "sZEST") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);
@@ -46,4 +46,4 @@ contract Zest is ERC20, ERC20Burnable, Pausable, AccessControl {
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
-}
+} 
