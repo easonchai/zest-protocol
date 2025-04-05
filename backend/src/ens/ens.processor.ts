@@ -19,7 +19,7 @@ export class ENSProcessor {
   ) {
     // Use Base Sepolia provider for registration
     const baseProvider = new ethers.JsonRpcProvider(
-      this.configService.get<string>('RPC_URL'),
+      this.configService.get<string>('BASE_RPC_URL'),
     );
     const baseSigner = new ethers.Wallet(
       this.configService.get<string>('PRIVATE_KEY') || '',

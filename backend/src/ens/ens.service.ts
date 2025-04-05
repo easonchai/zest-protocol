@@ -21,7 +21,7 @@ export class ENSService implements OnModuleInit {
   ) {
     // Base sepolia provider for registry/registrar
     this.baseProvider = new ethers.JsonRpcProvider(
-      this.configService.get<string>('RPC_URL'),
+      this.configService.get<string>('BASE_RPC_URL'),
     );
 
     // ETH sepolia provider for resolution

@@ -22,7 +22,7 @@ export class BlockchainService implements OnModuleInit {
 
   constructor(private configService: ConfigService) {
     this.provider = new ethers.JsonRpcProvider(
-      this.configService.get<string>('RPC_URL'),
+      this.configService.get<string>('CITREA_RPC_URL'),
     );
   }
 
