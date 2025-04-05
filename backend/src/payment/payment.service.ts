@@ -6,6 +6,8 @@ import { ethers } from 'ethers';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PaymentPaginationDto } from './dto/payment.dto';
+import * as ERC20ABI from '../token/abi/ERC20.json';
+import { ConfigService } from '@nestjs/config';
 
 export interface BalanceResponse {
   address: string;
@@ -30,11 +32,13 @@ export interface PaymentRequestResponse {
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
+  private readonly erc20Iface = new ethers.Interface(ERC20ABI.abi);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
     private readonly ensService: ENSService,
+    private readonly configService: ConfigService,
     @InjectQueue('payment') private paymentQueue: Queue,
   ) {}
 
@@ -110,26 +114,38 @@ export class PaymentService {
       throw new Error('Payment request has expired');
     }
 
+    const amount = ethers.parseEther(paymentRequest.amount);
+
     // Prepare transaction based on token type
     let transactionData;
     switch (paymentRequest.token) {
       case 'cBTC':
-        transactionData = this.tokenService.prepareCBTCTransfer(
-          fromAddress,
-          paymentRequest.amount,
-        );
+        // For native cBTC, we just need to send the amount
+        transactionData = {
+          to: fromAddress,
+          value: amount,
+          data: '0x',
+        };
         break;
       case 'ZEST':
-        transactionData = this.tokenService.prepareZESTTransfer(
-          fromAddress,
-          paymentRequest.amount,
-        );
+        transactionData = {
+          to: this.configService.get<string>('ZEST_CONTRACT'),
+          data: this.erc20Iface.encodeFunctionData('transfer', [
+            fromAddress,
+            amount,
+          ]),
+          value: '0',
+        };
         break;
       case 'USDT':
-        transactionData = this.tokenService.prepareUSDTTransfer(
-          fromAddress,
-          paymentRequest.amount,
-        );
+        transactionData = {
+          to: this.configService.get<string>('USDT_CONTRACT'),
+          data: this.erc20Iface.encodeFunctionData('transfer', [
+            fromAddress,
+            amount,
+          ]),
+          value: '0',
+        };
         break;
       default:
         throw new Error('Unsupported token type');

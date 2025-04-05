@@ -12,6 +12,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
 import { PriceFeedModule } from './price-feed/price-feed.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ENSModule } from './ens/ens.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ENSModule } from './ens/ens.module';
     StakingModule,
     SwapModule,
     TransactionModule,
+    // PaymentModule,
     ENSModule,
   ],
   controllers: [AppController],

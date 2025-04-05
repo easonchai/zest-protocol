@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, Min, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsNotEmpty,
+  IsOptional,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class CreateSwapDto {
   @ApiProperty({
@@ -7,6 +15,7 @@ export class CreateSwapDto {
     example: '0x1234...',
   })
   @IsString()
+  @IsNotEmpty()
   swapper: string;
 
   @ApiProperty({
@@ -23,7 +32,7 @@ export class CreateSwapDto {
     enum: ['USDT', 'ZEST'],
   })
   @IsString()
-  @IsIn(['USDT', 'ZEST'])
+  @IsNotEmpty()
   fromToken: string;
 
   @ApiProperty({
@@ -32,8 +41,43 @@ export class CreateSwapDto {
     enum: ['USDT', 'ZEST'],
   })
   @IsString()
-  @IsIn(['USDT', 'ZEST'])
+  @IsNotEmpty()
   toToken: string;
+}
+
+export class GetSwapBySwapperDto {
+  @IsString()
+  @IsNotEmpty()
+  swapper: string;
+}
+
+export class GetSwapRateDto {
+  @IsString()
+  @IsNotEmpty()
+  fromToken: string;
+
+  @IsString()
+  @IsNotEmpty()
+  toToken: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  amount: number;
+}
+
+export class SwapPaginationDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  swapper?: string;
+
+  @IsOptional()
+  @IsString()
+  fromToken?: string;
+
+  @IsOptional()
+  @IsString()
+  toToken?: string;
 }
 
 export class SwapResponseDto {

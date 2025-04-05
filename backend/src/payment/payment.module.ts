@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
 import { PrismaService } from '../prisma/prisma.service';
-import { ENSService } from '../ens/ens.service';
+import { ENSModule } from '../ens/ens.module';
 import { TokenModule } from '../token/token.module';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
@@ -11,6 +11,7 @@ import { ConfigModule } from '@nestjs/config';
   imports: [
     ConfigModule,
     TokenModule,
+    ENSModule,
     BullModule.registerQueue({
       name: 'payment',
       defaultJobOptions: {
@@ -23,7 +24,7 @@ import { ConfigModule } from '@nestjs/config';
     }),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, PrismaService, ENSService],
+  providers: [PaymentService, PrismaService],
   exports: [PaymentService],
 })
 export class PaymentModule {}

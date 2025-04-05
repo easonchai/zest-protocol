@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  ValidationPipe,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -8,7 +16,12 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { SwapService } from './swap.service';
-import { CreateSwapDto } from './dto/swap.dto';
+import {
+  CreateSwapDto,
+  GetSwapBySwapperDto,
+  GetSwapRateDto,
+  SwapPaginationDto,
+} from './dto/swap.dto';
 
 @ApiTags('Swap')
 @Controller('swap')
@@ -21,76 +34,22 @@ export class SwapController {
     status: 200,
     description: 'Returns the prepared transaction data.',
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        swapper: {
-          type: 'string',
-          description: 'The Ethereum address of the swapper',
-          example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        },
-        fromToken: {
-          type: 'string',
-          description: 'The token address to swap from',
-          example: '0x123...',
-        },
-        toToken: {
-          type: 'string',
-          description: 'The token address to swap to',
-          example: '0x456...',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of tokens to swap',
-          example: 100,
-        },
-      },
-      required: ['swapper', 'fromToken', 'toToken', 'amount'],
-    },
-  })
-  prepareSwap(@Body() createSwapDto: CreateSwapDto) {
+  @ApiBody({ type: CreateSwapDto })
+  prepareSwap(@Body(ValidationPipe) createSwapDto: CreateSwapDto) {
     return this.swapService.prepareSwap(createSwapDto);
   }
 
   @Post('record')
   @ApiOperation({ summary: 'Record a completed swap transaction' })
   @ApiResponse({ status: 201, description: 'Swap recorded successfully.' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        swapper: {
-          type: 'string',
-          description: 'The Ethereum address of the swapper',
-          example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        },
-        fromToken: {
-          type: 'string',
-          description: 'The token address swapped from',
-          example: '0x123...',
-        },
-        toToken: {
-          type: 'string',
-          description: 'The token address swapped to',
-          example: '0x456...',
-        },
-        amount: {
-          type: 'number',
-          description: 'Amount of tokens swapped',
-          example: 100,
-        },
-      },
-      required: ['swapper', 'fromToken', 'toToken', 'amount'],
-    },
-  })
+  @ApiBody({ type: CreateSwapDto })
   @ApiQuery({
     name: 'txHash',
     description: 'The transaction hash of the swap',
     example: '0x123...',
   })
   async recordSwap(
-    @Body() createSwapDto: CreateSwapDto,
+    @Body(ValidationPipe) createSwapDto: CreateSwapDto,
     @Query('txHash') txHash: string,
   ) {
     return await this.swapService.recordSwap(createSwapDto, txHash);
@@ -99,27 +58,12 @@ export class SwapController {
   @Get('rate')
   @ApiOperation({ summary: 'Get swap rate' })
   @ApiResponse({ status: 200, description: 'Returns the swap rate.' })
-  @ApiQuery({
-    name: 'fromToken',
-    description: 'The token address to swap from',
-    example: '0x123...',
-  })
-  @ApiQuery({
-    name: 'toToken',
-    description: 'The token address to swap to',
-    example: '0x456...',
-  })
-  @ApiQuery({
-    name: 'amount',
-    description: 'Amount of tokens to swap',
-    example: 100,
-  })
-  async getSwapRate(
-    @Query('fromToken') fromToken: string,
-    @Query('toToken') toToken: string,
-    @Query('amount') amount: number,
-  ) {
-    return this.swapService.getSwapRate(fromToken, toToken, amount);
+  getSwapRate(@Query(ValidationPipe) query: GetSwapRateDto) {
+    return this.swapService.getSwapRate(
+      query.fromToken,
+      query.toToken,
+      query.amount,
+    );
   }
 
   @Get(':swapper')
@@ -130,8 +74,8 @@ export class SwapController {
     description: 'The Ethereum address of the swapper',
     example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
   })
-  async getSwaps(@Param('swapper') swapper: string) {
-    return this.swapService.findBySwapper(swapper);
+  async getSwaps(@Param(ValidationPipe) params: GetSwapBySwapperDto) {
+    return this.swapService.findBySwapper(params.swapper);
   }
 
   @Get()
@@ -149,7 +93,25 @@ export class SwapController {
     required: false,
     example: 10,
   })
-  async getAllSwaps(@Query('page') page = 1, @Query('limit') limit = 10) {
-    return this.swapService.findAll(page, limit);
+  @ApiQuery({
+    name: 'swapper',
+    description: 'Filter by swapper address',
+    required: false,
+    example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+  })
+  @ApiQuery({
+    name: 'fromToken',
+    description: 'Filter by from token',
+    required: false,
+    example: 'USDT',
+  })
+  @ApiQuery({
+    name: 'toToken',
+    description: 'Filter by to token',
+    required: false,
+    example: 'ZEST',
+  })
+  async getAllSwaps(@Query(ValidationPipe) query: SwapPaginationDto) {
+    return this.swapService.findAll(query);
   }
 }
