@@ -1,11 +1,11 @@
 "use client";
 
-import type React from "react";
-
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { X, QrCode } from "lucide-react";
+import { getBalance } from "@/utils/api";
 
 interface Recipient {
   id: string;
@@ -13,12 +13,29 @@ interface Recipient {
 }
 
 export function SendForm() {
-  const [sendAmount, setSendAmount] = useState("230.00");
+  const { address } = useAccount();
+  const [sendAmount, setSendAmount] = useState("0.00");
   const [inputValue, setInputValue] = useState("");
-  const [recipients, setRecipients] = useState<Recipient[]>([
-    { id: "1", name: "luc.zest" },
-  ]);
+  const [suggestedValue, setSuggestedValue] = useState("");
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [balance, setBalance] = useState("0.00");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address) return;
+      try {
+        const balanceData = await getBalance(address);
+        setBalance(balanceData.zest);
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        setBalance("0.00");
+      }
+    };
+
+    fetchBalance();
+  }, [address]);
 
   // Focus input when recipients change
   useEffect(() => {
@@ -27,23 +44,34 @@ export function SendForm() {
     }
   }, [recipients]);
 
+  // Update suggested value as user types
+  useEffect(() => {
+    if (inputValue && !inputValue.endsWith(".zest")) {
+      setSuggestedValue(`${inputValue}.zest`);
+    } else {
+      setSuggestedValue("");
+    }
+  }, [inputValue]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    setInputValue(value);
+  };
 
-    // If user is typing .zest manually, don't auto-append
-    if (value.endsWith(".zest")) {
-      setInputValue(value);
-      return;
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSendAmount(e.target.value);
+  };
+
+  const handleAmountBlur = () => {
+    const num = parseFloat(sendAmount);
+    if (!isNaN(num)) {
+      setSendAmount(num.toFixed(2));
     }
-
-    // Remove any existing .zest and append it again
-    const baseName = value.replace(/\.zest$/, "");
-    setInputValue(baseName ? `${baseName}.zest` : "");
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    // Add recipient on Enter, Space, or comma
-    if (e.key === "Enter" || e.key === " " || e.key === ",") {
+    // Add recipient on Enter, Tab, or comma
+    if (e.key === "Enter" || e.key === "Tab" || e.key === ",") {
       e.preventDefault();
       addRecipient();
     }
@@ -55,19 +83,20 @@ export function SendForm() {
   };
 
   const addRecipient = () => {
-    if (inputValue.trim() && !inputValue.trim().endsWith(".zest")) {
-      return; // Don't add if doesn't end with .zest
-    }
+    if (!inputValue.trim()) return;
 
-    if (
-      inputValue.trim() &&
-      !recipients.some((r) => r.name === inputValue.trim())
-    ) {
+    // If input doesn't end with .zest, use the suggested value
+    const nameToAdd = inputValue.endsWith(".zest")
+      ? inputValue.trim()
+      : suggestedValue.trim();
+
+    if (nameToAdd && !recipients.some((r) => r.name === nameToAdd)) {
       setRecipients([
         ...recipients,
-        { id: Date.now().toString(), name: inputValue.trim() },
+        { id: Date.now().toString(), name: nameToAdd },
       ]);
       setInputValue("");
+      setSuggestedValue("");
     }
   };
 
@@ -105,16 +134,23 @@ export function SendForm() {
                   </button>
                 </div>
               ))}
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onBlur={addRecipient}
-                className="flex-1 min-w-[120px] outline-none bg-transparent"
-                placeholder={recipients.length === 0 ? "Type a name..." : ""}
-              />
+              <div className="relative flex-1 min-w-[120px]">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={addRecipient}
+                  className="w-full outline-none bg-transparent relative z-10"
+                  placeholder={recipients.length === 0 ? "Type a name..." : ""}
+                />
+                {suggestedValue && (
+                  <div className="absolute inset-0 text-[#9CA3AF] pointer-events-none">
+                    {suggestedValue}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -126,19 +162,22 @@ export function SendForm() {
                 <input
                   type="text"
                   value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value)}
+                  onChange={handleAmountChange}
+                  onBlur={handleAmountBlur}
                   className="bg-transparent text-[2.75rem] leading-tight font-bold text-[#2A2A2A] w-40 focus:outline-none"
                 />
               </div>
               <div className="flex items-start">
                 <div className="flex flex-col items-end">
                   <div className="flex items-center">
-                    <span className="text-xl font-semibold mr-2 text-[#2A2A2A]">
+                    <span className="text-xl font-extrabold mr-2 text-[#2A2A2A]">
                       ZEST
                     </span>
                     <ZestTokenIcon />
                   </div>
-                  <div className="text-[#A5A5A5] text-sm">Bal: 1,325</div>
+                  <div className="text-[#A5A5A5] text-sm font-semibold">
+                    Bal: {balance}
+                  </div>
                 </div>
               </div>
             </div>
