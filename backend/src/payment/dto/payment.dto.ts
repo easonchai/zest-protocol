@@ -27,6 +27,9 @@ export class PaymentRequestDto {
   @IsString()
   description?: string;
 
+  @IsString()
+  fromAddress: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

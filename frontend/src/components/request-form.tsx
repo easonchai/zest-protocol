@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { BitcoinIcon } from "./btc-token-icon";
@@ -32,6 +33,7 @@ const tokens: Token[] = [
 ];
 
 export function RequestForm() {
+  const { address, isConnected } = useAccount();
   const [amount, setAmount] = useState("0.00");
   const [selectedToken, setSelectedToken] = useState<Token["symbol"]>("ZEST");
   const [description, setDescription] = useState("");
@@ -55,11 +57,14 @@ export function RequestForm() {
   };
 
   const handleSubmit = async () => {
+    if (!address) return;
+
     setIsLoading(true);
     try {
       const data = await createPaymentRequest(
         amount,
         selectedToken,
+        address,
         description
       );
       setPaymentRequest(data);
@@ -72,6 +77,20 @@ export function RequestForm() {
 
   const SelectedTokenIcon =
     tokens.find((t) => t.symbol === selectedToken)?.icon || ZestTokenIcon;
+
+  if (!isConnected) {
+    return (
+      <div className="max-w-md mx-auto px-4">
+        <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 space-y-6">
+            <div className="text-center text-[#827A77] mb-4">
+              Please connect your wallet to create a payment request
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (paymentRequest) {
     return (
@@ -202,7 +221,7 @@ export function RequestForm() {
           {/* Create Request Button */}
           <Button
             onClick={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading || !address}
             className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm"
           >
             {isLoading ? "Creating request..." : "Create request"}

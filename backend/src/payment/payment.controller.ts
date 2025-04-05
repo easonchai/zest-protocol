@@ -84,6 +84,7 @@ export class PaymentController {
         value: {
           amount: '1.0',
           token: 'cBTC',
+          fromAddress: '0x1234...5678',
           description: 'Payment for services',
           expiresIn: 3600,
         },

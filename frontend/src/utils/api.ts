@@ -79,6 +79,7 @@ interface PaymentRequestResponse {
 export async function createPaymentRequest(
   amount: string,
   token: "ZEST" | "cBTC",
+  fromAddress: string,
   description?: string
 ): Promise<PaymentRequestResponse> {
   const response = await fetch(`${API_BASE_URL}/payment/request`, {
@@ -89,6 +90,7 @@ export async function createPaymentRequest(
     body: JSON.stringify({
       amount,
       token,
+      fromAddress,
       description: description || "Payment for services",
       expiresIn: 3600,
     }),

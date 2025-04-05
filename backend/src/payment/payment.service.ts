@@ -21,6 +21,7 @@ export interface PaymentRequest {
   token: 'cBTC' | 'ZEST' | 'USDT';
   description?: string;
   expiresIn?: number; // seconds
+  fromAddress: string;
 }
 
 export interface PaymentRequestResponse {
@@ -87,6 +88,7 @@ export class PaymentService {
         amount: request.amount,
         token: request.token,
         description: request.description,
+        fromAddress: request.fromAddress,
         expiresAt: new Date(expiresAt * 1000),
         status: 'PENDING',
       },
