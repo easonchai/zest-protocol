@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { BitcoinIcon } from "./btc-token-icon";
+import { QRCodeSVG } from "qrcode.react";
+import { createPaymentRequest } from "@/utils/api";
 import {
   Select,
   SelectContent,
@@ -18,6 +20,12 @@ interface Token {
   icon: React.ComponentType;
 }
 
+interface PaymentRequestData {
+  requestId: string;
+  qrData: string;
+  expiresAt: number;
+}
+
 const tokens: Token[] = [
   { symbol: "ZEST", name: "ZEST", icon: ZestTokenIcon },
   { symbol: "cBTC", name: "cBTC", icon: BitcoinIcon },
@@ -28,6 +36,8 @@ export function RequestForm() {
   const [selectedToken, setSelectedToken] = useState<Token["symbol"]>("ZEST");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentRequest, setPaymentRequest] =
+    useState<PaymentRequestData | null>(null);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmount(e.target.value);
@@ -47,26 +57,12 @@ export function RequestForm() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/payment/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount,
-          token: selectedToken,
-          description: description || "Payment for services",
-          expiresIn: 3600,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create payment request");
-      }
-
-      const data = await response.json();
-      // Handle successful request (e.g., show QR code)
-      console.log("Payment request created:", data);
+      const data = await createPaymentRequest(
+        amount,
+        selectedToken,
+        description
+      );
+      setPaymentRequest(data);
     } catch (error) {
       console.error("Error creating payment request:", error);
     } finally {
@@ -76,6 +72,55 @@ export function RequestForm() {
 
   const SelectedTokenIcon =
     tokens.find((t) => t.symbol === selectedToken)?.icon || ZestTokenIcon;
+
+  if (paymentRequest) {
+    return (
+      <div className="max-w-md mx-auto px-4">
+        <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 space-y-6">
+            {/* Description */}
+            <div className="text-center">
+              <p className="text-[#827A77] text-lg">
+                {description || "Payment for services"}
+              </p>
+            </div>
+
+            {/* Amount Display */}
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-4xl font-extrabold text-[#2A2A2A]">
+                {amount}
+              </span>
+              <div className="flex items-center">
+                <span className="text-2xl font-extrabold mr-2 text-[#2A2A2A]">
+                  {selectedToken}
+                </span>
+                <SelectedTokenIcon />
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div className="flex justify-center py-6">
+              <QRCodeSVG
+                value={paymentRequest.qrData}
+                size={200}
+                level="H"
+                includeMargin
+                className="rounded-lg"
+              />
+            </div>
+
+            {/* Create New Request Button */}
+            <Button
+              onClick={() => setPaymentRequest(null)}
+              className="w-full py-6 text-lg font-medium bg-[#CB4118] hover:bg-[#B3401E] text-white rounded-sm"
+            >
+              Create new request
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4">
@@ -87,7 +132,7 @@ export function RequestForm() {
             <Select value={selectedToken} onValueChange={handleTokenChange}>
               <SelectTrigger className="w-full bg-[#FBFBFB] border-0 p-3 text-[#2A2A2A] font-medium">
                 <div className="flex items-center gap-2">
-                  <SelectedTokenIcon />
+                  {/* <SelectedTokenIcon /> */}
                   <SelectValue placeholder="Select token" />
                 </div>
               </SelectTrigger>

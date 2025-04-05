@@ -69,3 +69,34 @@ export async function getEnsName(address: string): Promise<string | null> {
     return null;
   }
 }
+
+interface PaymentRequestResponse {
+  requestId: string;
+  qrData: string;
+  expiresAt: number;
+}
+
+export async function createPaymentRequest(
+  amount: string,
+  token: "ZEST" | "cBTC",
+  description?: string
+): Promise<PaymentRequestResponse> {
+  const response = await fetch(`${API_BASE_URL}/payment/request`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount,
+      token,
+      description: description || "Payment for services",
+      expiresIn: 3600,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create payment request");
+  }
+
+  return response.json();
+}
