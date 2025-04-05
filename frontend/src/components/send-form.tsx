@@ -46,10 +46,27 @@ export function SendForm() {
 
   // Update suggested value as user types
   useEffect(() => {
-    if (inputValue && !inputValue.endsWith(".zest")) {
-      setSuggestedValue(`${inputValue}.zest`);
-    } else {
+    if (!inputValue) {
       setSuggestedValue("");
+      return;
+    }
+
+    if (inputValue.endsWith(".zest")) {
+      setSuggestedValue("");
+      return;
+    }
+
+    // Check for partial .zest
+    if (inputValue.endsWith(".zes")) {
+      setSuggestedValue(inputValue + "t");
+    } else if (inputValue.endsWith(".ze")) {
+      setSuggestedValue(inputValue + "st");
+    } else if (inputValue.endsWith(".z")) {
+      setSuggestedValue(inputValue + "est");
+    } else if (inputValue.endsWith(".")) {
+      setSuggestedValue(inputValue + "zest");
+    } else {
+      setSuggestedValue(inputValue + ".zest");
     }
   }, [inputValue]);
 
@@ -113,7 +130,7 @@ export function SendForm() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <div className="text-[#827A77] text-lg">Send to</div>
-              <button className="text-[#CB4118] flex items-center text-sm font-medium">
+              <button className="text-[#CB4118] flex items-center text-sm font-medium cursor-pointer">
                 <QrCode className="w-4 h-4 mr-1" />
                 Scan QR
               </button>
