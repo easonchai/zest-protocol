@@ -11,6 +11,17 @@ import "../src/MockUSDT.sol";
 import "../src/sZest.sol";
 
 contract DeployScript is Script {
+    // Test accounts
+    address public constant BOB = 0x6f1524F5A1152d6b08ef8833E42E4311151e904F;
+
+    // Initial balances for testing
+    uint256 public constant INITIAL_CBTC_BALANCE = 100 ether;
+    uint256 public constant INITIAL_USDT_BALANCE = 1_000_000e18;
+    uint256 public constant INITIAL_ZEST_BALANCE = 1_000_000e18;
+    uint256 public constant STABILITY_POOL_DEPOSIT = 500_000e18;
+    uint256 public constant SWAP_MODULE_BALANCE = 100_000e18;
+    uint256 public constant STAKING_BALANCE = 100_000e18;
+
     function run() external {
         // Retrieve deployer private key from environment
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -65,9 +76,30 @@ contract DeployScript is Script {
         // Set initial cBTC Price
         cdpManager.setCBTCPrice(85000e18);
 
+        // Fund test accounts with cBTC
+        vm.deal(msg.sender, INITIAL_CBTC_BALANCE);
+        vm.deal(BOB, INITIAL_CBTC_BALANCE);
+
+        // Mint USDT to test accounts and SwapModule
+        usdt.mint(msg.sender, INITIAL_USDT_BALANCE);
+        usdt.mint(BOB, INITIAL_USDT_BALANCE);
+        usdt.mint(address(swapModule), INITIAL_USDT_BALANCE);
+
+        // Mint ZEST to test accounts and contracts
+        zest.mint(msg.sender, INITIAL_ZEST_BALANCE);
+        zest.mint(BOB, INITIAL_ZEST_BALANCE);
+        zest.mint(address(swapModule), SWAP_MODULE_BALANCE);
+        zest.mint(address(staking), STAKING_BALANCE);
+
+        // Setup initial deposits
+        vm.startPrank(BOB);
+        zest.approve(address(stabilityPool), STABILITY_POOL_DEPOSIT);
+        stabilityPool.deposit(STABILITY_POOL_DEPOSIT);
+        vm.stopPrank();
+
         vm.stopBroadcast();
 
-        // Log deployment addresses for verification
+        // Log deployment addresses and initial balances
         console.log("\nDeployment Summary:");
         console.log("-------------------");
         console.log("Mock USDT:", address(usdt));
@@ -77,5 +109,18 @@ contract DeployScript is Script {
         console.log("Stability Pool:", address(stabilityPool));
         console.log("Staking:", address(staking));
         console.log("Swap Module:", address(swapModule));
+
+        console.log("\nInitial Balances:");
+        console.log("-------------------");
+        console.log("Deployer (Alice) cBTC:", INITIAL_CBTC_BALANCE);
+        console.log("Bob cBTC:", INITIAL_CBTC_BALANCE);
+        console.log("Deployer (Alice) USDT:", INITIAL_USDT_BALANCE);
+        console.log("Bob USDT:", INITIAL_USDT_BALANCE);
+        console.log("Deployer (Alice) ZEST:", INITIAL_ZEST_BALANCE);
+        console.log("Bob ZEST:", INITIAL_ZEST_BALANCE);
+        console.log("SwapModule USDT:", INITIAL_USDT_BALANCE);
+        console.log("SwapModule ZEST:", SWAP_MODULE_BALANCE);
+        console.log("Staking ZEST:", STAKING_BALANCE);
+        console.log("StabilityPool ZEST:", STABILITY_POOL_DEPOSIT);
     }
 } 
