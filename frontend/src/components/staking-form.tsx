@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { SZestTokenIcon } from "./szest-token-icon";
 
 export function StakingForm() {
   const [stakeAmount, setStakeAmount] = useState("80.00");
+  const APY = 12.5; // 12.5% APY
 
   const handleMaxClick = () => {
     setStakeAmount("80.00"); // Set to max available amount
@@ -22,6 +23,24 @@ export function StakingForm() {
       setStakeAmount(num.toFixed(2));
     }
   };
+
+  // Calculate yearly yield based on stake amount and APY
+  const yearlyYield = useMemo(() => {
+    const amount = parseFloat(stakeAmount);
+    if (isNaN(amount)) return "0.00";
+    return ((amount * APY) / 100).toFixed(2);
+  }, [stakeAmount]);
+
+  // Calculate daily yield (yearly yield / 365)
+  // const dailyYield = useMemo(() => {
+  //   const yearly = parseFloat(yearlyYield);
+  //   if (isNaN(yearly)) return "0.00";
+  //   return (yearly / 365).toFixed(2);
+  // }, [yearlyYield]);
+
+  const sampleYield = useMemo(() => {
+    return ((1000 * APY) / 100).toFixed(2);
+  }, [APY]);
 
   return (
     <div className="max-w-md mx-auto px-4">
@@ -75,19 +94,21 @@ export function StakingForm() {
               <div className="text-gray-600 text-sm font-medium">
                 Total yield
               </div>
-              <div className="text-sm text-[#F4AA3E] font-bold">+12.5 APY</div>
+              <div className="text-sm text-[#F4AA3E] font-bold">
+                +{APY}% APY
+              </div>
             </div>
             <div className="flex items-center">
               <SZestTokenIcon size="sm" />
               <span className="text-4xl font-bold ml-2 text-[#2A2A2A]">
-                78.00
+                {yearlyYield}
               </span>
             </div>
           </div>
 
           {/* Info Text */}
           <div className="text-gray-500 text-sm text-center mt-0.5 mb-6">
-            You get 25 sZEST per day by staking 1000 ZEST.
+            You get {sampleYield} ZEST per day by staking 1000 ZEST.
           </div>
 
           {/* Continue Button */}
