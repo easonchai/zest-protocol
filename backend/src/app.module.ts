@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { CDPModule } from './cdp/cdp.module';
 import { StabilityPoolModule } from './stability-pool/stability-pool.module';
@@ -15,6 +18,12 @@ import { ENSModule } from './ens/ens.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      },
+    }),
     PrismaModule,
     BlockchainModule,
     PriceFeedModule,
@@ -25,5 +34,7 @@ import { ENSModule } from './ens/ens.module';
     TransactionModule,
     ENSModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
