@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { ethers } from "ethers";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export async function calculateSZESTAmount(amount: string): Promise<string> {
   const response = await fetch(
@@ -7,5 +9,9 @@ export async function calculateSZESTAmount(amount: string): Promise<string> {
   if (!response.ok) {
     throw new Error("Failed to calculate sZEST amount");
   }
-  return response.text();
+  const rawAmount = await response.text();
+  // Remove any decimal points and convert to BigInt string
+  const bigIntAmount = rawAmount.split(".")[0];
+  // Format from 18 decimals to 2 decimal places
+  return Number(ethers.formatEther(bigIntAmount)).toFixed(2);
 }

@@ -12,8 +12,11 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Zest Staking</title>
-        <meta name="description" content="Stake your ZEST tokens" />
+        <title>Zest Protocol</title>
+        <meta
+          name="description"
+          content="Spend like it's fiat, stack like it's BTC, program like it's DeFi."
+        />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 

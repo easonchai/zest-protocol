@@ -1,13 +1,36 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useDebounce } from "use-debounce";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { SZestTokenIcon } from "./szest-token-icon";
+import { calculateSZESTAmount } from "@/utils/api";
 
 export function StakingForm() {
   const [stakeAmount, setStakeAmount] = useState("80.00");
+  const [debouncedStakeAmount] = useDebounce(stakeAmount, 500);
+  const [szestAmount, setSzestAmount] = useState("0.00");
+  const [isLoading, setIsLoading] = useState(false);
   const APY = 12.5; // 12.5% APY
+
+  useEffect(() => {
+    const fetchSzestAmount = async () => {
+      if (!debouncedStakeAmount) return;
+      setIsLoading(true);
+      try {
+        const amount = await calculateSZESTAmount(debouncedStakeAmount);
+        setSzestAmount(amount);
+      } catch (error) {
+        console.error("Error calculating sZEST amount:", error);
+        setSzestAmount("0.00");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSzestAmount();
+  }, [debouncedStakeAmount]);
 
   const handleMaxClick = () => {
     setStakeAmount("80.00"); // Set to max available amount
@@ -24,23 +47,12 @@ export function StakingForm() {
     }
   };
 
-  // Calculate yearly yield based on stake amount and APY
-  const yearlyYield = useMemo(() => {
+  const dailyYield = useMemo(() => {
     const amount = parseFloat(stakeAmount);
     if (isNaN(amount)) return "0.00";
-    return ((amount * APY) / 100).toFixed(2);
-  }, [stakeAmount]);
-
-  // Calculate daily yield (yearly yield / 365)
-  // const dailyYield = useMemo(() => {
-  //   const yearly = parseFloat(yearlyYield);
-  //   if (isNaN(yearly)) return "0.00";
-  //   return (yearly / 365).toFixed(2);
-  // }, [yearlyYield]);
-
-  const sampleYield = useMemo(() => {
-    return ((1000 * APY) / 100).toFixed(2);
-  }, [APY]);
+    // Calculate daily yield from APY: (amount * APY) / (100 * 365)
+    return ((amount * APY) / (100 * 365)).toFixed(2);
+  }, [stakeAmount, APY]);
 
   return (
     <div className="max-w-md mx-auto px-4">
@@ -101,14 +113,14 @@ export function StakingForm() {
             <div className="flex items-center">
               <SZestTokenIcon size="sm" />
               <span className="text-4xl font-bold ml-2 text-[#2A2A2A]">
-                {yearlyYield}
+                {isLoading ? "..." : szestAmount}
               </span>
             </div>
           </div>
 
           {/* Info Text */}
           <div className="text-gray-500 text-sm text-center mt-0.5 mb-6">
-            You get {sampleYield} ZEST per day by staking 1000 ZEST.
+            You get {dailyYield} ZEST per day by staking {stakeAmount} ZEST.
           </div>
 
           {/* Continue Button */}
