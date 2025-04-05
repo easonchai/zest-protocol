@@ -25,8 +25,10 @@ model CDP {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   isLiquidated Boolean  @default(false)
+  txHash       String   @unique
 
   @@index([owner])
+  @@index([txHash])
 }
 
 // Track Stability Pool deposits
@@ -48,10 +50,12 @@ model Stake {
   staker      String // wallet address
   amount      Float // amount of ZEST
   sZestAmount Float // amount of sZEST
+  txHash      String   @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([staker])
+  @@index([txHash])
 }
 
 // Track protocol statistics
