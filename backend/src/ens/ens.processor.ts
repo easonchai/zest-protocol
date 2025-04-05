@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ethers } from 'ethers';
 import * as L2RegistrarABI from './abi/L2Registrar.json';
-import * as ReverseRegistrarABI from './abi/ReverseRegistrar.json';
+// import * as ReverseRegistrarABI from './abi/ReverseRegistrar.json';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -27,13 +27,13 @@ export class ENSProcessor {
     );
 
     // Use ETH Sepolia provider for reverse resolution
-    const ethProvider = new ethers.JsonRpcProvider(
-      this.configService.get<string>('ENS_RPC_URL'),
-    );
-    const ethSigner = new ethers.Wallet(
-      this.configService.get<string>('PRIVATE_KEY') || '',
-      ethProvider,
-    );
+    // const ethProvider = new ethers.JsonRpcProvider(
+    //   this.configService.get<string>('ENS_RPC_URL'),
+    // );
+    // const ethSigner = new ethers.Wallet(
+    //   this.configService.get<string>('PRIVATE_KEY') || '',
+    //   ethProvider,
+    // );
 
     this.l2Registrar = new ethers.Contract(
       this.configService.get<string>('L2_REGISTRAR_CONTRACT') || '',
@@ -41,11 +41,11 @@ export class ENSProcessor {
       baseSigner,
     );
 
-    this.reverseRegistrar = new ethers.Contract(
-      this.configService.get<string>('REVERSE_REGISTRAR_CONTRACT') || '',
-      ReverseRegistrarABI.abi,
-      ethSigner,
-    );
+    // this.reverseRegistrar = new ethers.Contract(
+    //   this.configService.get<string>('REVERSE_REGISTRAR_CONTRACT') || '',
+    //   ReverseRegistrarABI.abi,
+    //   ethSigner,
+    // );
   }
 
   @Process('register')
