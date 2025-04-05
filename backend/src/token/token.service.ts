@@ -7,7 +7,6 @@ import * as ERC20ABI from './abi/ERC20.json';
 export class TokenService {
   private readonly logger = new Logger(TokenService.name);
   private provider: ethers.JsonRpcProvider;
-  private cbtcContract: ethers.Contract;
   private zestContract: ethers.Contract;
   private usdtContract: ethers.Contract;
 
@@ -17,12 +16,6 @@ export class TokenService {
     );
 
     // Initialize token contracts
-    this.cbtcContract = new ethers.Contract(
-      this.configService.get<string>('CBTC_CONTRACT') || '',
-      ERC20ABI.abi,
-      this.provider,
-    );
-
     this.zestContract = new ethers.Contract(
       this.configService.get<string>('ZEST_CONTRACT') || '',
       ERC20ABI.abi,
@@ -37,7 +30,7 @@ export class TokenService {
   }
 
   async getCBTCBalance(address: string): Promise<bigint> {
-    return await this.cbtcContract.balanceOf(address);
+    return await this.provider.getBalance(address);
   }
 
   async getZESTBalance(address: string): Promise<bigint> {
@@ -48,20 +41,17 @@ export class TokenService {
     return await this.usdtContract.balanceOf(address);
   }
 
-  prepareCBTCTransfer(from: string, amount: string) {
-    const iface = new ethers.Interface(ERC20ABI.abi);
-    const data = iface.encodeFunctionData('transfer', [from, amount]);
-
+  prepareCBTCTransfer(to: string, amount: string) {
     return {
-      to: this.cbtcContract.target,
-      data,
-      value: '0',
+      to,
+      value: amount,
+      data: '0x',
     };
   }
 
-  prepareZESTTransfer(from: string, amount: string) {
+  prepareZESTTransfer(to: string, amount: string) {
     const iface = new ethers.Interface(ERC20ABI.abi);
-    const data = iface.encodeFunctionData('transfer', [from, amount]);
+    const data = iface.encodeFunctionData('transfer', [to, amount]);
 
     return {
       to: this.zestContract.target,
@@ -70,9 +60,9 @@ export class TokenService {
     };
   }
 
-  prepareUSDTTransfer(from: string, amount: string) {
+  prepareUSDTTransfer(to: string, amount: string) {
     const iface = new ethers.Interface(ERC20ABI.abi);
-    const data = iface.encodeFunctionData('transfer', [from, amount]);
+    const data = iface.encodeFunctionData('transfer', [to, amount]);
 
     return {
       to: this.usdtContract.target,

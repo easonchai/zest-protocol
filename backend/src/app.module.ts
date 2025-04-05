@@ -13,6 +13,7 @@ import { PriceFeedModule } from './price-feed/price-feed.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ENSModule } from './ens/ens.module';
 import { PaymentModule } from './payment/payment.module';
+import { KYCModule } from './kyc/kyc.module';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import { PaymentModule } from './payment/payment.module';
     StakingModule,
     SwapModule,
     TransactionModule,
-    // PaymentModule,
+    PaymentModule,
+    KYCModule,
     ENSModule,
   ],
   controllers: [AppController],
