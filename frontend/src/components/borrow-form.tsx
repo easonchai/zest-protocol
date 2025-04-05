@@ -91,8 +91,12 @@ export function BorrowForm() {
         const formattedBtcBalance = Number(
           ethers.formatEther(balance.cbtc)
         ).toFixed(3);
+        // Format ZEST balance to show 3 decimals
+        const formattedZestBalance = Number(
+          ethers.formatEther(balance.zest)
+        ).toFixed(2);
         setBtcBalance(formattedBtcBalance);
-        setZestBalance(balance.zest);
+        setZestBalance(formattedZestBalance);
       } catch (error) {
         console.error("Error fetching balances:", error);
         setBtcBalance("0.000");
@@ -262,6 +266,8 @@ export function BorrowForm() {
         ],
         value: parseEther(collateralAmount),
       })) as `0x${string}` | undefined;
+
+      console.log(hash);
 
       if (!hash) {
         throw new Error("Failed to send transaction");
