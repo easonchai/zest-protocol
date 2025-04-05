@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { BitcoinIcon } from "./btc-token-icon";
 import { ZestTokenIcon } from "./zest-token-icon";
-import { getBalance, getBtcPrice } from "@/utils/api";
+import { getBalance, getBtcPrice, prepareCDP, recordCDP } from "@/utils/api";
 import { ethers } from "ethers";
 import InterestSlider from "./interest-slider";
+import { toast } from "sonner";
 
 export function BorrowForm() {
   const { address } = useAccount();
+  const { writeContract, isPending } = useWriteContract();
   const [collateralAmount, setCollateralAmount] = useState("0.02");
   const [mintAmount, setMintAmount] = useState("0");
   const [interestRate, setInterestRate] = useState(5.3);
@@ -23,6 +25,7 @@ export function BorrowForm() {
   const [zestBalance, setZestBalance] = useState("0.00");
   const [btcPrice, setBtcPrice] = useState("0.00");
   const [liquidationPrice, setLiquidationPrice] = useState("0.00");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Collateral ratios
   const COLLATERAL_RATIOS = {
@@ -149,6 +152,76 @@ export function BorrowForm() {
 
   const handleInterestRateChange = (value: number) => {
     setInterestRate(value);
+  };
+
+  const handleMint = async () => {
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+
+      // Prepare CDP transaction
+      const cdpData = await prepareCDP({
+        owner: address,
+        collateral: collateralAmount,
+        debt: mintAmount,
+        interestRate,
+      });
+
+      // Send transaction
+      const result = await writeContract({
+        address: cdpData.to as `0x${string}`,
+        abi: [
+          {
+            inputs: [
+              { name: "collateralAmount", type: "uint256" },
+              { name: "debtAmount", type: "uint256" },
+              { name: "interestRate", type: "uint256" },
+            ],
+            name: "openCDP",
+            outputs: [],
+            stateMutability: "payable",
+            type: "function",
+          },
+        ],
+        functionName: "openCDP",
+        args: [
+          ethers.parseEther(cdpData.collateral),
+          ethers.parseEther(cdpData.debt),
+          BigInt(cdpData.interestRate),
+        ],
+        value: ethers.parseEther(cdpData.value),
+      });
+
+      if (result === undefined) {
+        throw new Error("Transaction failed");
+      }
+
+      // Record CDP in backend
+      await recordCDP(
+        {
+          collateral: collateralAmount,
+          debt: mintAmount,
+          interestRate,
+        },
+        result as string
+      );
+
+      // Refresh balances
+      const newBalances = await getBalance(address);
+      setBtcBalance(newBalances.cbtc);
+      setZestBalance(newBalances.zest);
+
+      toast.success("CDP created successfully!");
+    } catch (error) {
+      console.error("Error creating CDP:", error);
+      toast.error("Failed to create CDP");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -362,8 +435,12 @@ export function BorrowForm() {
           </div>
 
           {/* Mint Button */}
-          <Button className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm">
-            Mint
+          <Button
+            className="w-full py-6 text-lg font-medium bg-primary hover:bg-primary/90 text-white rounded-sm cursor-pointer"
+            onClick={handleMint}
+            disabled={isProcessing || isPending}
+          >
+            {isProcessing || isPending ? "Processing..." : "Mint"}
           </Button>
         </div>
       </div>

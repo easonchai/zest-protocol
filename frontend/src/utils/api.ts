@@ -129,3 +129,52 @@ export async function preparePayment(requestId: string): Promise<PaymentData> {
 
   return response.json();
 }
+
+export interface CDPData {
+  to: string;
+  data: string;
+  value: string;
+  collateral: string;
+  debt: string;
+  interestRate: number;
+}
+
+export interface CreateCDPDto {
+  owner: string;
+  collateral: string;
+  debt: string;
+  interestRate: number;
+}
+
+export async function prepareCDP(dto: CreateCDPDto): Promise<CDPData> {
+  const response = await fetch(`${API_BASE_URL}/cdp/prepare`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(dto),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to prepare CDP");
+  }
+
+  return response.json();
+}
+
+export async function recordCDP(
+  dto: CreateCDPDto,
+  txHash: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/cdp/record?txHash=${txHash}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(dto),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to record CDP");
+  }
+}
