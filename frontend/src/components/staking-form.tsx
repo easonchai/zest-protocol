@@ -2,21 +2,46 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useDebounce } from "use-debounce";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { ZestTokenIcon } from "./zest-token-icon";
 import { SZestTokenIcon } from "./szest-token-icon";
-import { calculateSZESTAmount } from "@/utils/api";
+import { calculateSZESTAmount, getBalance } from "@/utils/api";
 
 export function StakingForm() {
-  const [stakeAmount, setStakeAmount] = useState("80.00");
+  const { address } = useAccount();
+  const [balance, setBalance] = useState<string>("0.00");
+  const [stakeAmount, setStakeAmount] = useState("0.00");
   const [debouncedStakeAmount] = useDebounce(stakeAmount, 500);
   const [szestAmount, setSzestAmount] = useState("0.00");
   const [isLoading, setIsLoading] = useState(false);
   const APY = 12.5; // 12.5% APY
 
   useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address) return;
+      try {
+        const balance = await getBalance(address);
+        setBalance(balance.zest);
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        setBalance("0.00");
+      }
+    };
+
+    fetchBalance();
+  }, [address]);
+
+  useEffect(() => {
     const fetchSzestAmount = async () => {
-      if (!debouncedStakeAmount) return;
+      if (
+        !debouncedStakeAmount ||
+        !address ||
+        debouncedStakeAmount === "0.00"
+      ) {
+        setSzestAmount("0.00");
+        return;
+      }
       setIsLoading(true);
       try {
         const amount = await calculateSZESTAmount(debouncedStakeAmount);
@@ -30,10 +55,10 @@ export function StakingForm() {
     };
 
     fetchSzestAmount();
-  }, [debouncedStakeAmount]);
+  }, [debouncedStakeAmount, address]);
 
   const handleMaxClick = () => {
-    setStakeAmount("80.00"); // Set to max available amount
+    setStakeAmount(Number(balance).toFixed(2));
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +75,27 @@ export function StakingForm() {
   const dailyYield = useMemo(() => {
     const amount = parseFloat(stakeAmount);
     if (isNaN(amount)) return "0.00";
-    // Calculate daily yield from APY: (amount * APY) / (100 * 365)
     return ((amount * APY) / (100 * 365)).toFixed(2);
   }, [stakeAmount, APY]);
+
+  const formattedBalance = useMemo(() => {
+    return Number(balance).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }, [balance]);
+
+  if (!address) {
+    return (
+      <div className="max-w-md mx-auto px-4">
+        <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden p-6 text-center">
+          <p className="text-gray-500">
+            Please connect your wallet to stake ZEST
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4">
@@ -72,7 +115,7 @@ export function StakingForm() {
                   className="bg-transparent text-[2.75rem] leading-tight font-bold text-[#2A2A2A] w-40 focus:outline-none"
                 />
                 <button
-                  className="px-1 py-0.5 text-xs font-medium border border-primary text-primary rounded-xs w-fit mt-1"
+                  className="px-1 py-0.5 text-xs font-medium border border-[#EBE7E7] text-[#4A4A4A] rounded-xs w-fit mt-1"
                   onClick={handleMaxClick}
                 >
                   MAX
@@ -87,7 +130,7 @@ export function StakingForm() {
                     <ZestTokenIcon />
                   </div>
                   <div className="text-gray-400 font-semibold text-sm">
-                    Bal: 1,325
+                    Bal: {formattedBalance}
                   </div>
                 </div>
               </div>
