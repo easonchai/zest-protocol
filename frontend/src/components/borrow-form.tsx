@@ -9,7 +9,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { BitcoinIcon } from "./btc-token-icon";
 import { ZestTokenIcon } from "./zest-token-icon";
-import { getBalance, getBtcPrice, prepareCDP, recordCDP } from "@/utils/api";
+import {
+  getBalance,
+  getBtcPrice,
+  prepareCDP,
+  recordCDP,
+  checkCDPExists,
+} from "@/utils/api";
 import { ethers } from "ethers";
 import InterestSlider from "./interest-slider";
 import { toast } from "sonner";
@@ -17,7 +23,21 @@ import { parseEther } from "viem";
 
 export function BorrowForm() {
   const { address } = useAccount();
-  const { writeContract, isPending } = useWriteContract();
+  const { writeContract, isPending } = useWriteContract({
+    mutation: {
+      onSuccess: (hash: `0x${string}`) => {
+        setTxHash(hash);
+        setIsProcessing(true);
+      },
+      onError: (error: Error) => {
+        console.error("Error creating CDP:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create CDP"
+        );
+        setIsProcessing(false);
+      },
+    },
+  });
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const { data: receipt, error: receiptError } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -222,8 +242,6 @@ export function BorrowForm() {
     }
 
     try {
-      setIsProcessing(true);
-
       // Validate inputs
       if (!collateralAmount || !mintAmount) {
         throw new Error("Please enter valid amounts");
@@ -242,38 +260,75 @@ export function BorrowForm() {
         throw new Error("Invalid CDP data received from server");
       }
 
-      // Send transaction
-      const hash = (await writeContract({
-        address: cdpData.to as `0x${string}`,
-        abi: [
-          {
-            inputs: [
-              { name: "collateralAmount", type: "uint256" },
-              { name: "debtAmount", type: "uint256" },
-              { name: "interestRate", type: "uint256" },
-            ],
-            name: "openCDP",
-            outputs: [],
-            stateMutability: "payable",
-            type: "function",
-          },
-        ],
-        functionName: "openCDP",
-        args: [
-          ethers.parseEther(collateralAmount),
-          ethers.parseEther(mintAmount),
-          BigInt(Math.round(interestRate * 100)),
-        ],
-        value: parseEther(collateralAmount),
-      })) as `0x${string}` | undefined;
+      // Check if CDP exists
+      const cdpExists = await checkCDPExists(address);
 
-      console.log(hash);
+      if (cdpExists) {
+        // If CDP exists, use addCollateral and mintDebt
+        writeContract({
+          address: cdpData.to as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "amount", type: "uint256" }],
+              name: "addCollateral",
+              outputs: [],
+              stateMutability: "payable",
+              type: "function",
+            },
+            {
+              inputs: [{ name: "amount", type: "uint256" }],
+              name: "mintDebt",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ],
+          functionName: "addCollateral",
+          args: [ethers.parseEther(collateralAmount)],
+          value: parseEther(collateralAmount),
+        });
 
-      if (!hash) {
-        throw new Error("Failed to send transaction");
+        // Mint additional debt
+        writeContract({
+          address: cdpData.to as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "amount", type: "uint256" }],
+              name: "mintDebt",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ],
+          functionName: "mintDebt",
+          args: [ethers.parseEther(mintAmount)],
+        });
+      } else {
+        // If no CDP exists, create a new one
+        writeContract({
+          address: cdpData.to as `0x${string}`,
+          abi: [
+            {
+              inputs: [
+                { name: "collateralAmount", type: "uint256" },
+                { name: "debtAmount", type: "uint256" },
+                { name: "interestRate", type: "uint256" },
+              ],
+              name: "openCDP",
+              outputs: [],
+              stateMutability: "payable",
+              type: "function",
+            },
+          ],
+          functionName: "openCDP",
+          args: [
+            ethers.parseEther(collateralAmount),
+            ethers.parseEther(mintAmount),
+            BigInt(Math.round(interestRate * 100)),
+          ],
+          value: parseEther(collateralAmount),
+        });
       }
-
-      setTxHash(hash);
     } catch (error) {
       console.error("Error creating CDP:", error);
       toast.error(

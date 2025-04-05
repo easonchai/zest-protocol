@@ -178,3 +178,19 @@ export async function recordCDP(
     throw new Error("Failed to record CDP");
   }
 }
+
+export async function checkCDPExists(address: string): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/cdp/owner/${address.toLowerCase()}`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to check CDP existence");
+    }
+    const data = await response.json();
+    return data.collateral > 0; // If collateral is greater than 0, CDP exists
+  } catch (error) {
+    console.error("Error checking CDP existence:", error);
+    return false;
+  }
+}
