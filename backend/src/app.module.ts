@@ -8,6 +8,7 @@ import { SwapModule } from './swap/swap.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { PriceFeedModule } from './price-feed/price-feed.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { ENSModule } from './ens/ens.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TransactionModule } from './transaction/transaction.module';
     StakingModule,
     SwapModule,
     TransactionModule,
+    ENSModule,
   ],
 })
 export class AppModule {}

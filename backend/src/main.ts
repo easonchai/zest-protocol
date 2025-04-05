@@ -23,7 +23,7 @@ async function bootstrap() {
     .addTag('Swap', 'Token swap operations')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
   // Start the server
