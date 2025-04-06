@@ -57,11 +57,11 @@ zest-protocol/
 
 | Contract       | Address                                                                                                                              | Description                                                         |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| ZEST Token     | [0xF1Ba8F20dfFf02a14DAfd142BdD06F109363e991](https://explorer.testnet.citrea.xyz/address/0xF1Ba8F20dfFf02a14DAfd142BdD06F109363e991) | ERC20 implementation of ZEST stablecoin with mint/burn capabilities |
-| CDP Manager    | [0xFF9Ca882332846e0c3F037cc4B25Ef9f581295b1](https://explorer.testnet.citrea.xyz/address/0xFF9Ca882332846e0c3F037cc4B25Ef9f581295b1) | Manages collateral positions, debt issuance, and liquidations       |
-| Stability Pool | [0x1560f6fF20b79F04F99864f91DA9df8842FA6c99](https://explorer.testnet.citrea.xyz/address/0x1560f6fF20b79F04F99864f91DA9df8842FA6c99) | Handles liquidation processing and reward distribution              |
-| Swap Module    | [0x79198aD7c074021eAaD7dCcAEF45F230108b91a1](https://explorer.testnet.citrea.xyz/address/0x79198aD7c074021eAaD7dCcAEF45F230108b91a1) | Facilitates 1:1 USDT to ZEST swaps                                  |
-| Mock USDT      | [0xAe3DB17Ffeb5B1AA4aA3Ff7bE8304aDb98feEE71](https://explorer.testnet.citrea.xyz/address/0xAe3DB17Ffeb5B1AA4aA3Ff7bE8304aDb98feEE71) | For test swaps                                                      |
+| ZEST Token     | [0x2e83C79192c378D27E4D8afFaD3eE883fc091c17](https://explorer.testnet.citrea.xyz/address/0x2e83C79192c378D27E4D8afFaD3eE883fc091c17) | ERC20 implementation of ZEST stablecoin with mint/burn capabilities |
+| CDP Manager    | [0xcD90fc187DC693F23D989F7a3a448BDf88797AEB](https://explorer.testnet.citrea.xyz/address/0xcD90fc187DC693F23D989F7a3a448BDf88797AEB) | Manages collateral positions, debt issuance, and liquidations       |
+| Stability Pool | [0xaa5689e5638632deD6035acE6b39bA8596c21178](https://explorer.testnet.citrea.xyz/address/0xaa5689e5638632deD6035acE6b39bA8596c21178) | Handles liquidation processing and reward distribution              |
+| Swap Module    | [0xbb8662d1d7572a48350fFAc34e787005734F218b](https://explorer.testnet.citrea.xyz/address/0xbb8662d1d7572a48350fFAc34e787005734F218b) | Facilitates 1:1 USDT to ZEST swaps                                  |
+| Mock USDT      | [0x4749e74C19B538F6415AED63eA971e59460C2F14](https://explorer.testnet.citrea.xyz/address/0x4749e74C19B538F6415AED63eA971e59460C2F14) | For test swaps                                                      |
 
 ### ENS Integration
 
