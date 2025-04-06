@@ -1,0 +1,32 @@
+services:
+  zest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure
+    depends_on:
+      zest-redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - zest
+      - elvtd
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.zest.rule=Host(`zest.elvtd.io`)'
+      - 'traefik.http.routers.zest.tls.certresolver=myresolver'
+      - 'traefik.http.services.zest.loadbalancer.server.port=8889'
+
+  zest-redis:
+    image: redis:latest
+    networks:
+      - zest
+
+volumes:
+  zest-data:
+
+networks:
+  zest:
+  elvtd:
+    external: true

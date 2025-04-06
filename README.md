@@ -61,6 +61,7 @@ zest-protocol/
 | CDP Manager    | [0xFF9Ca882332846e0c3F037cc4B25Ef9f581295b1](https://explorer.testnet.citrea.xyz/address/0xFF9Ca882332846e0c3F037cc4B25Ef9f581295b1) | Manages collateral positions, debt issuance, and liquidations       |
 | Stability Pool | [0x1560f6fF20b79F04F99864f91DA9df8842FA6c99](https://explorer.testnet.citrea.xyz/address/0x1560f6fF20b79F04F99864f91DA9df8842FA6c99) | Handles liquidation processing and reward distribution              |
 | Swap Module    | [0x79198aD7c074021eAaD7dCcAEF45F230108b91a1](https://explorer.testnet.citrea.xyz/address/0x79198aD7c074021eAaD7dCcAEF45F230108b91a1) | Facilitates 1:1 USDT to ZEST swaps                                  |
+| Mock USDT      | [0xAe3DB17Ffeb5B1AA4aA3Ff7bE8304aDb98feEE71](https://explorer.testnet.citrea.xyz/address/0xAe3DB17Ffeb5B1AA4aA3Ff7bE8304aDb98feEE71) | For test swaps                                                      |
 
 ### ENS Integration
 
